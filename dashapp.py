@@ -20,14 +20,18 @@ df_selic = pd.read_excel("data/Selic historica.xlsx")
 df_imoveis["Preço"] = pd.to_numeric(df_imoveis["Preço"], errors="coerce")
 df_imoveis = df_imoveis.dropna(subset=["Preço"])
 
-# IPTU/ITBI → colunas: "ANO", "IPTU", "ITBI"
-df_iptu_itbi["ANO"] = pd.to_numeric(df_iptu_itbi["ANO"], errors="coerce")
-df_iptu_itbi["IPTU"] = pd.to_numeric(df_iptu_itbi["IPTU"], errors="coerce")
-df_iptu_itbi["ITBI"] = pd.to_numeric(df_iptu_itbi["ITBI"], errors="coerce")
+# IPTU/ITBI → primeira linha é o indicador, colunas são anos
+df_iptu_itbi = df_iptu_itbi.melt(id_vars=["ANO"], var_name="Ano", value_name="Valor")
+# Corrigir tipos
+df_iptu_itbi["Ano"] = pd.to_numeric(df_iptu_itbi["Ano"], errors="coerce")
+df_iptu_itbi["Valor"] = pd.to_numeric(df_iptu_itbi["Valor"], errors="coerce")
 
-# Selic → colunas: "data", "% a.a."
+# Selic → pegar apenas valores de dezembro de cada ano
 df_selic["data"] = pd.to_datetime(df_selic["data"], errors="coerce")
 df_selic["% a.a."] = pd.to_numeric(df_selic["% a.a."], errors="coerce")
+df_selic["ano"] = df_selic["data"].dt.year
+df_selic["mes"] = df_selic["data"].dt.month
+df_selic_dez = df_selic[df_selic["mes"] == 12].groupby("ano").last().reset_index()
 
 # =========================
 # Gráficos
@@ -40,28 +44,25 @@ fig_imoveis = px.histogram(
     title="Distribuição de Preços dos Imóveis"
 )
 
-# Série temporal IPTU
+# IPTU
 fig_iptu = px.line(
-    df_iptu_itbi,
-    x="ANO",
-    y="IPTU",
+    df_iptu_itbi[df_iptu_itbi["ANO"] == "IPTU"],
+    x="Ano", y="Valor",
     title="Evolução Histórica do IPTU"
 )
 
-# Série temporal ITBI
+# ITBI
 fig_itbi = px.line(
-    df_iptu_itbi,
-    x="ANO",
-    y="ITBI",
+    df_iptu_itbi[df_iptu_itbi["ANO"] == "ITBI"],
+    x="Ano", y="Valor",
     title="Evolução Histórica do ITBI"
 )
 
-# Série temporal Selic
+# Selic (dezembro de cada ano)
 fig_selic = px.line(
-    df_selic,
-    x="data",
-    y="% a.a.",
-    title="Taxa Selic ao longo do tempo"
+    df_selic_dez,
+    x="ano", y="% a.a.",
+    title="Taxa Selic (dezembro de cada ano)"
 )
 
 # =========================
@@ -70,8 +71,8 @@ fig_selic = px.line(
 app.layout = html.Div([
     html.H1("Análise Econômica Territorial"),
     html.P(f"Total de imóveis carregados: {len(df_imoveis)}"),
-    html.P(f"Série histórica IPTU: {len(df_iptu_itbi)} anos"),
-    html.P(f"Série histórica Selic: {len(df_selic)} registros"),
+    html.P(f"Série histórica IPTU/ITBI: {len(df_iptu_itbi)} registros"),
+    html.P(f"Série histórica Selic (dezembro): {len(df_selic_dez)} anos"),
     dcc.Graph(figure=fig_imoveis),
     dcc.Graph(figure=fig_iptu),
     dcc.Graph(figure=fig_itbi),
