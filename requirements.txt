@@ -1,5 +1,9 @@
 dash
+dash-bootstrap-components
 plotly
 pandas
+geopandas
+folium
+statsmodels
 gunicorn
 openpyxl
