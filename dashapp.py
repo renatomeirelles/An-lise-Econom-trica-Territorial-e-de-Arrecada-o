@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc
+from dash import html, dcc, Input, Output
 import plotly.express as px
 import pandas as pd
 import folium
@@ -13,7 +13,6 @@ server = app.server   # ESSENCIAL para o Render
 # =========================
 df_imoveis = pd.read_excel("data/imoveis_georreferenciados_novembro.xlsx")
 df_series = pd.read_excel("data/serie historica iptu itbi.xlsx")
-df_selic = pd.read_excel("data/Selic historica.xlsx")
 # =========================
 # Ajustes nos imóveis
 # =========================
@@ -33,49 +32,111 @@ df_series = df_series.melt(id_vars=["index"], var_name="Indicador", value_name="
 df_series = df_series.rename(columns={"index": "Ano"})
 df_series["Ano"] = pd.to_numeric(df_series["Ano"], errors="coerce")
 df_series["Valor"] = pd.to_numeric(df_series["Valor"].astype(str).str.replace(",", "."), errors="coerce")
-df_series = df_series[df_series["Indicador"] != "Numero de ITBIs"]
-
+df_series = df_series[df_series["Indicador"].isin(["IPTU", "ITBI"])]
 # =========================
-# Ajustes na Selic
-# =========================
-df_selic.columns = df_selic.columns.str.strip().str.lower()
-for col in df_selic.columns:
-    if "a.a" in col or "taxa" in col:
-        df_selic = df_selic.rename(columns={col: "taxa"})
-
-df_selic["data"] = pd.to_datetime(df_selic["data"], errors="coerce")
-df_selic["taxa"] = pd.to_numeric(df_selic["taxa"], errors="coerce")
-df_selic["ano"] = df_selic["data"].dt.year
-df_selic["mes"] = df_selic["data"].dt.month
-df_selic_dez = df_selic[df_selic["mes"] == 12].groupby("ano").last().reset_index()
-# =========================
-# Gráficos
-# =========================
-# Histograma de preços dos imóveis
-fig_imoveis = px.histogram(df_imoveis, x="Preço", nbins=30, title="Distribuição de Preços dos Imóveis")
-
 # Gráfico único IPTU + ITBI
+# =========================
 fig_iptu_itbi = px.line(
-    df_series[df_series["Indicador"].isin(["IPTU", "ITBI"])],
+    df_series,
     x="Ano", y="Valor", color="Indicador",
     title="Evolução Histórica IPTU e ITBI"
 )
 
-# Gráfico da Selic
-fig_selic = px.line(df_selic_dez, x="ano", y="taxa", title="Taxa Selic (dezembro de cada ano)")
+# =========================
+# Função para gerar mapa Folium
+# =========================
+def gerar_mapa(tipo="Todos", estilo="pontos"):
+    mapa = folium.Map(location=[-23.42, -51.93], zoom_start=12)
+
+    # Filtrar imóveis por tipo
+    if tipo != "Todos":
+        dados = df_imoveis[df_imoveis["Tipo"] == tipo]
+    else:
+        dados = df_imoveis
+
+    # Adicionar pontos
+    if estilo == "pontos":
+        for _, row in dados.iterrows():
+            folium.CircleMarker(
+                location=[row["latitude"], row["longitude"]],
+                radius=5,
+                popup=f"{row['Tipo']} - R$ {row['Preço']:,.0f}",
+                color="blue",
+                fill=True
+            ).add_to(mapa)
+
+    # Cluster
+    elif estilo == "cluster":
+        cluster = MarkerCluster().add_to(mapa)
+        for _, row in dados.iterrows():
+            folium.Marker(
+                location=[row["latitude"], row["longitude"]],
+                popup=f"{row['Tipo']} - R$ {row['Preço']:,.0f}"
+            ).add_to(cluster)
+
+    # Heatmap
+    elif estilo == "calor":
+        HeatMap(data=dados[["latitude", "longitude"]].values.tolist()).add_to(mapa)
+
+    return mapa._repr_html_()  # retorna HTML embutido
 # =========================
 # Layout
 # =========================
 app.layout = html.Div([
     html.H1("Análise Econômica Territorial"),
-    html.P(f"Total de imóveis carregados: {len(df_imoveis)}"),
     html.P(f"Preço médio geral: R$ {preco_medio_total:,.0f}"),
-    html.P(f"Série histórica Selic (dezembro): {len(df_selic_dez)} anos"),
-    dcc.Graph(figure=fig_imoveis),
-    dcc.Graph(figure=fig_iptu_itbi),
-    dcc.Graph(figure=fig_selic),
-    html.P("Mapa interativo será integrado aqui em breve...")
+
+    # Filtros
+    html.Label("Tipo de imóvel:"),
+    dcc.Dropdown(
+        id="filtro-tipo",
+        options=[{"label": "Todos", "value": "Todos"}] +
+                [{"label": t, "value": t} for t in df_imoveis["Tipo"].unique()],
+        value="Todos"
+    ),
+
+    html.Label("Estilo do mapa:"),
+    dcc.Dropdown(
+        id="filtro-estilo",
+        options=[
+            {"label": "Pontos", "value": "pontos"},
+            {"label": "Cluster", "value": "cluster"},
+            {"label": "Calor", "value": "calor"}
+        ],
+        value="pontos"
+    ),
+
+    # Mapa
+    html.Iframe(id="mapa", width="100%", height="600"),
+
+    # Histograma dinâmico
+    dcc.Graph(id="grafico-precos"),
+
+    # Gráfico IPTU+ITBI
+    dcc.Graph(figure=fig_iptu_itbi)
 ])
+
+# =========================
+# Callbacks
+# =========================
+@app.callback(
+    Output("mapa", "srcDoc"),
+    Output("grafico-precos", "figure"),
+    Input("filtro-tipo", "value"),
+    Input("filtro-estilo", "value")
+)
+def atualizar_mapa(tipo, estilo):
+    mapa_html = gerar_mapa(tipo, estilo)
+
+    # Atualizar histograma conforme filtro
+    if tipo != "Todos":
+        dados = df_imoveis[df_imoveis["Tipo"] == tipo]
+    else:
+        dados = df_imoveis
+
+    fig_hist = px.histogram(dados, x="Preço", nbins=30, title=f"Distribuição de Preços - {tipo}")
+
+    return mapa_html, fig_hist
 
 if __name__ == "__main__":
     app.run_server(debug=True)
