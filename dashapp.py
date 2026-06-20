@@ -16,7 +16,7 @@ df_imoveis = pd.read_excel("data/imoveis_georreferenciados_novembro.xlsx")
 df_series = pd.read_excel("data/serie historica iptu itbi.xlsx")
 
 # Carregar shapefile dos bairros
-gdf_bairros = gpd.read_file("data/bairros.shp")
+gdf_bairros = gpd.read_file("data/municipio_completo.shp")
 
 # =========================
 # Ajustes nos imóveis
