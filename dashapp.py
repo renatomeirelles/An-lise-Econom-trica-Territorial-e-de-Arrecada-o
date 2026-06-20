@@ -26,12 +26,32 @@ df_iptu_itbi = df_iptu_itbi.melt(id_vars=["ANO"], var_name="Ano", value_name="Va
 df_iptu_itbi["Ano"] = pd.to_numeric(df_iptu_itbi["Ano"], errors="coerce")
 df_iptu_itbi["Valor"] = pd.to_numeric(df_iptu_itbi["Valor"], errors="coerce")
 
-# Selic → pegar apenas valores de dezembro de cada ano
+df_selic = pd.read_excel("data/Selic historica.xlsx")
+
+# Mostrar no log quais colunas vieram
+print("Colunas Selic:", df_selic.columns.tolist())
+
+# Padronizar nomes: remover espaços, deixar minúsculo
+df_selic.columns = df_selic.columns.str.strip().str.lower()
+
+# Agora renomear a coluna da taxa
+# Se aparecer algo como "% a.a.", "% a.a", "taxa a.a.", etc., vamos renomear para "taxa"
+for col in df_selic.columns:
+    if "a.a" in col or "taxa" in col:
+        df_selic = df_selic.rename(columns={col: "taxa"})
+
+# Converter tipos
 df_selic["data"] = pd.to_datetime(df_selic["data"], errors="coerce")
-df_selic["% a.a."] = pd.to_numeric(df_selic["% a.a."], errors="coerce")
+df_selic["taxa"] = pd.to_numeric(df_selic["taxa"], errors="coerce")
+
+# Selecionar apenas dezembro de cada ano
 df_selic["ano"] = df_selic["data"].dt.year
 df_selic["mes"] = df_selic["data"].dt.month
 df_selic_dez = df_selic[df_selic["mes"] == 12].groupby("ano").last().reset_index()
+
+# Gráfico da Selic
+fig_selic = px.line(df_selic_dez, x="ano", y="taxa", title="Taxa Selic (dezembro de cada ano)")
+
 
 # =========================
 # Gráficos
