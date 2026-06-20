@@ -58,12 +58,28 @@ fig_itbi = px.line(
     title="Evolução Histórica do ITBI"
 )
 
-# Selic (dezembro de cada ano)
-fig_selic = px.line(
-    df_selic_dez,
-    x="ano", y="% a.a.",
-    title="Taxa Selic (dezembro de cada ano)"
-)
+# Selic
+df_selic = pd.read_excel("data/Selic historica.xlsx")
+
+# Padronizar nomes das colunas
+df_selic.columns = df_selic.columns.str.strip().str.lower()
+
+# Agora temos colunas: "nº", "data", "vigencia", "% a.a."
+# Vamos renomear "% a.a." para "taxa"
+df_selic = df_selic.rename(columns={"% a.a.": "taxa"})
+
+# Converter tipos
+df_selic["data"] = pd.to_datetime(df_selic["data"], errors="coerce")
+df_selic["taxa"] = pd.to_numeric(df_selic["taxa"], errors="coerce")
+
+# Selecionar apenas dezembro de cada ano
+df_selic["ano"] = df_selic["data"].dt.year
+df_selic["mes"] = df_selic["data"].dt.month
+df_selic_dez = df_selic[df_selic["mes"] == 12].groupby("ano").last().reset_index()
+
+# Gráfico da Selic
+fig_selic = px.line(df_selic_dez, x="ano", y="taxa", title="Taxa Selic (dezembro de cada ano)")
+
 
 # =========================
 # Layout
