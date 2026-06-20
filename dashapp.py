@@ -10,96 +10,57 @@ server = app.server   # ESSENCIAL para o Render
 # Carregar dados
 # =========================
 df_imoveis = pd.read_excel("data/imoveis_georreferenciados_novembro.xlsx")
-df_iptu_itbi = pd.read_excel("data/serie historica iptu itbi.xlsx")
+df_series = pd.read_excel("data/serie historica iptu itbi.xlsx")
 df_selic = pd.read_excel("data/Selic historica.xlsx")
-
 # =========================
-# Ajustes nas planilhas
+# Ajustes nos imóveis
 # =========================
-# Imóveis
 df_imoveis["Preço"] = pd.to_numeric(df_imoveis["Preço"], errors="coerce")
 df_imoveis = df_imoveis.dropna(subset=["Preço"])
 
-# IPTU/ITBI → primeira linha é o indicador, colunas são anos
-df_iptu_itbi = df_iptu_itbi.melt(id_vars=["ANO"], var_name="Ano", value_name="Valor")
-# Corrigir tipos
-df_iptu_itbi["Ano"] = pd.to_numeric(df_iptu_itbi["Ano"], errors="coerce")
-df_iptu_itbi["Valor"] = pd.to_numeric(df_iptu_itbi["Valor"], errors="coerce")
+# =========================
+# Ajustes nas séries históricas
+# =========================
+# Primeira coluna é o indicador, demais são anos
+df_series = df_series.set_index("ANO").T.reset_index()
+df_series = df_series.melt(id_vars=["index"], var_name="Indicador", value_name="Valor")
+df_series = df_series.rename(columns={"index": "Ano"})
+df_series["Ano"] = pd.to_numeric(df_series["Ano"], errors="coerce")
+df_series["Valor"] = pd.to_numeric(df_series["Valor"].astype(str).str.replace(",", "."), errors="coerce")
 
-df_selic = pd.read_excel("data/Selic historica.xlsx")
+# Remover série "Numero de ITBIs"
+df_series = df_series[df_series["Indicador"] != "Numero de ITBIs"]
 
-# Mostrar no log quais colunas vieram
-print("Colunas Selic:", df_selic.columns.tolist())
-
-# Padronizar nomes: remover espaços, deixar minúsculo
+# =========================
+# Ajustes na Selic
+# =========================
 df_selic.columns = df_selic.columns.str.strip().str.lower()
-
-# Agora renomear a coluna da taxa
-# Se aparecer algo como "% a.a.", "% a.a", "taxa a.a.", etc., vamos renomear para "taxa"
 for col in df_selic.columns:
     if "a.a" in col or "taxa" in col:
         df_selic = df_selic.rename(columns={col: "taxa"})
 
-# Converter tipos
 df_selic["data"] = pd.to_datetime(df_selic["data"], errors="coerce")
 df_selic["taxa"] = pd.to_numeric(df_selic["taxa"], errors="coerce")
-
-# Selecionar apenas dezembro de cada ano
 df_selic["ano"] = df_selic["data"].dt.year
 df_selic["mes"] = df_selic["data"].dt.month
 df_selic_dez = df_selic[df_selic["mes"] == 12].groupby("ano").last().reset_index()
-
-# Gráfico da Selic
-fig_selic = px.line(df_selic_dez, x="ano", y="taxa", title="Taxa Selic (dezembro de cada ano)")
-
-
 # =========================
 # Gráficos
 # =========================
-# Histograma de preços dos imóveis
-fig_imoveis = px.histogram(
-    df_imoveis,
-    x="Preço",
-    nbins=30,
-    title="Distribuição de Preços dos Imóveis"
-)
+fig_imoveis = px.histogram(df_imoveis, x="Preço", nbins=30, title="Distribuição de Preços dos Imóveis")
 
-# IPTU
-fig_iptu = px.line(
-    df_iptu_itbi[df_iptu_itbi["ANO"] == "IPTU"],
-    x="Ano", y="Valor",
-    title="Evolução Histórica do IPTU"
-)
-
-# ITBI
-fig_itbi = px.line(
-    df_iptu_itbi[df_iptu_itbi["ANO"] == "ITBI"],
-    x="Ano", y="Valor",
-    title="Evolução Histórica do ITBI"
-)
-
-# Selic
-df_selic = pd.read_excel("data/Selic historica.xlsx")
-
-# Padronizar nomes das colunas
-df_selic.columns = df_selic.columns.str.strip().str.lower()
-
-# Agora temos colunas: "nº", "data", "vigencia", "% a.a."
-# Vamos renomear "% a.a." para "taxa"
-df_selic = df_selic.rename(columns={"% a.a.": "taxa"})
-
-# Converter tipos
-df_selic["data"] = pd.to_datetime(df_selic["data"], errors="coerce")
-df_selic["taxa"] = pd.to_numeric(df_selic["taxa"], errors="coerce")
-
-# Selecionar apenas dezembro de cada ano
-df_selic["ano"] = df_selic["data"].dt.year
-df_selic["mes"] = df_selic["data"].dt.month
-df_selic_dez = df_selic[df_selic["mes"] == 12].groupby("ano").last().reset_index()
+# Gerar gráficos para todas as séries
+graficos_series = []
+for indicador in df_series["Indicador"].unique():
+    fig = px.line(
+        df_series[df_series["Indicador"] == indicador],
+        x="Ano", y="Valor",
+        title=f"Evolução Histórica - {indicador}"
+    )
+    graficos_series.append(dcc.Graph(figure=fig))
 
 # Gráfico da Selic
 fig_selic = px.line(df_selic_dez, x="ano", y="taxa", title="Taxa Selic (dezembro de cada ano)")
-
 
 # =========================
 # Layout
@@ -107,11 +68,10 @@ fig_selic = px.line(df_selic_dez, x="ano", y="taxa", title="Taxa Selic (dezembro
 app.layout = html.Div([
     html.H1("Análise Econômica Territorial"),
     html.P(f"Total de imóveis carregados: {len(df_imoveis)}"),
-    html.P(f"Série histórica IPTU/ITBI: {len(df_iptu_itbi)} registros"),
+    html.P(f"Séries históricas: {len(df_series['Indicador'].unique())} indicadores"),
     html.P(f"Série histórica Selic (dezembro): {len(df_selic_dez)} anos"),
     dcc.Graph(figure=fig_imoveis),
-    dcc.Graph(figure=fig_iptu),
-    dcc.Graph(figure=fig_itbi),
+    *graficos_series,   # todos os gráficos das séries
     dcc.Graph(figure=fig_selic)
 ])
 
