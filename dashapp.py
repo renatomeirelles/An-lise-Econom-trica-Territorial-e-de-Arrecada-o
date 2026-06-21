@@ -337,6 +337,10 @@ def atualizar_mapa(tipo, estilo):
             html.P(f"2027: R$ {itbi_forecast[itbi_forecast['Ano']==2027]['Valor'].values[0]:,.0f}".replace(",", "."), style={"color":"#eee"})
         ], style={"backgroundColor":"#222","padding":"15px","flex":"1","border":"1px solid #444"})
 
+        # Debug opcional: imprimir previsões no log
+        print("IPTU Forecast DF:", iptu_forecast)
+        print("ITBI Forecast DF:", itbi_forecast)
+
         return mapa_html, fig_hist, resumo, [previsao_iptu, previsao_itbi]
 
     except Exception as e:
