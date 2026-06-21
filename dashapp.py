@@ -15,6 +15,7 @@ external_stylesheets = ["https://cdnjs.cloudflare.com/ajax/libs/bootswatch/5.3.0
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
+app.title = "Inteligência Fiscal e Territorial - Modelagem Econométrica — Maringá"
 
 # =========================
 # Configuração Jawg
@@ -66,21 +67,21 @@ df_series["Valor"] = pd.to_numeric(df_series["Valor"].astype(str).str.replace(",
 df_series = df_series[df_series["Indicador"].isin(["IPTU", "ITBI"])]
 
 # =========================
-# ARIMA previsões IPTU e ITBI (treino até 2024, previsão 2025–2027)
+# ARIMA previsões IPTU e ITBI (treino até 2025, previsão 2026–2027)
 # =========================
 df_final = df_series.pivot(index="Ano", columns="Indicador", values="Valor").dropna()
-df_treino = df_final[df_final.index <= 2024]
+df_treino = df_final[df_final.index <= 2025]  # treino até 2025
 
 # IPTU
 iptu_series = df_treino["IPTU"]
 model_iptu = ARIMA(iptu_series, order=(1,1,1)).fit()
-forecast_iptu = model_iptu.forecast(steps=3)  # 2025, 2026, 2027
+forecast_iptu = model_iptu.forecast(steps=2)  # apenas 2026 e 2027
 forecast_iptu = forecast_iptu * 1.2           # reajuste 20% em cada ano
 
 # ITBI
 itbi_series = df_treino["ITBI"]
 model_itbi = ARIMA(itbi_series, order=(1,1,1)).fit()
-forecast_itbi = model_itbi.forecast(steps=3)  # 2025, 2026, 2027
+forecast_itbi = model_itbi.forecast(steps=2)  # apenas 2026 e 2027
 # =========================
 # Gráfico IPTU+ITBI com previsões (sem gap, até 2027)
 # =========================
@@ -88,20 +89,20 @@ df_plot = df_treino.reset_index()
 df_plot = df_plot.melt(id_vars="Ano", var_name="Indicador", value_name="Valor")
 df_plot["Tipo"] = "Histórico"
 
-# Previsões — incluindo 2024 para continuidade e 2025–2027
+# Previsões — apenas 2026 e 2027
 df_forecast = pd.DataFrame({
-    "Ano": [2024, 2025, 2026, 2027, 2024, 2025, 2026, 2027],
-    "Indicador": ["IPTU","IPTU","IPTU","IPTU","ITBI","ITBI","ITBI","ITBI"],
-    "Valor": [iptu_series.iloc[-1], forecast_iptu.iloc[0], forecast_iptu.iloc[1], forecast_iptu.iloc[2],
-              itbi_series.iloc[-1], forecast_itbi.iloc[0], forecast_itbi.iloc[1], forecast_itbi.iloc[2]],
-    "Tipo": ["Histórico","Previsão","Previsão","Previsão","Histórico","Previsão","Previsão","Previsão"]
+    "Ano": [2026, 2027, 2026, 2027],
+    "Indicador": ["IPTU","IPTU","ITBI","ITBI"],
+    "Valor": [forecast_iptu.iloc[0], forecast_iptu.iloc[1],
+              forecast_itbi.iloc[0], forecast_itbi.iloc[1]],
+    "Tipo": ["Previsão","Previsão","Previsão","Previsão"]
 })
 df_plot = pd.concat([df_plot, df_forecast])
 
 fig_iptu_itbi = px.line(
     df_plot, x="Ano", y="Valor", color="Indicador",
     line_dash="Tipo", markers=True,
-    title="Evolução Histórica e Previsões IPTU e ITBI (2025–2027)"
+    title="Evolução Histórica e Previsões IPTU e ITBI (2026–2027)"
 )
 
 # =========================
@@ -181,7 +182,8 @@ def gerar_mapa_calor(dados, estilo_jawg="jawg-dark"):
 # Layout
 # =========================
 app.layout = html.Div([
-    html.H1("Análise Econômica Territorial", style={"textAlign": "center", "marginBottom": "30px"}),
+    html.H1("Inteligência Fiscal e Territorial - Modelagem Econométrica — Maringá",
+            style={"textAlign": "center", "marginBottom": "30px"}),
 
     # Filtros
     html.Div([
@@ -191,7 +193,8 @@ app.layout = html.Div([
                 id="filtro-tipo",
                 options=[{"label": "Todos", "value": "Todos"}] +
                         [{"label": t, "value": t} for t in df_imoveis["Tipo"].unique()],
-                value="Todos"
+                value="Todos",
+                clearable=False   # mantém o valor visível
             )
         ], style={"flex": "1"}),
 
@@ -205,7 +208,8 @@ app.layout = html.Div([
                     {"label": "Cluster", "value": "cluster"},
                     {"label": "Calor", "value": "calor"}
                 ],
-                value="coropletico"
+                value="coropletico",
+                clearable=False   # mantém o valor visível
             )
         ], style={"flex": "1"})
     ], style={"display": "flex", "gap": "20px", "marginBottom": "20px"}),
@@ -213,14 +217,11 @@ app.layout = html.Div([
     # Cards resumo
     html.Div(id="cards", style={"display": "flex", "gap": "20px", "margin": "20px 0"}),
 
-    # Mapa + gráfico de dispersão lado a lado
+    # Mapa + gráfico de distribuição lado a lado
     html.Div([
         html.Iframe(id="mapa", width="65%", height="600", style={"border": "1px solid #444"}),
-        dcc.Graph(id="grafico-dispersao", style={"width": "35%", "height": "600px"})
+        dcc.Graph(id="grafico-precos", style={"width": "35%", "height": "600px"})
     ], style={"display": "flex", "gap": "20px"}),
-
-    # Histograma dinâmico abaixo
-    dcc.Graph(id="grafico-precos", style={"marginTop": "30px"}),
 
     # Gráfico IPTU+ITBI
     dcc.Graph(figure=fig_iptu_itbi, style={"marginTop": "30px"})
@@ -232,7 +233,6 @@ app.layout = html.Div([
 @app.callback(
     Output("mapa", "srcDoc"),
     Output("grafico-precos", "figure"),
-    Output("grafico-dispersao", "figure"),
     Output("cards", "children"),
     Input("filtro-tipo", "value"),
     Input("filtro-estilo", "value")
@@ -253,43 +253,36 @@ def atualizar_mapa(tipo, estilo):
     else:
         mapa_html = gerar_mapa_coropletico(dados)
 
-    # Histograma
+    # Gráfico de distribuição de vendas (histograma)
     if len(dados) > 0:
-        fig_hist = px.histogram(dados, x="Preço", nbins=30, title=f"Distribuição de Preços - {tipo}")
+        fig_hist = px.histogram(dados, x="Preço", nbins=30,
+                                title=f"Distribuição de Vendas - {tipo}")
     else:
         fig_hist = px.histogram(title="Sem dados para este filtro")
-
-    # Gráfico de dispersão (Preço vs Preço por m²)
-    if len(dados) > 0:
-        fig_disp = px.scatter(dados, x="Preço por m²", y="Preço", color="Bairro",
-                              title=f"Dispersão de Preços - {tipo}", opacity=0.7)
-    else:
-        fig_disp = px.scatter(title="Sem dados para este filtro")
 
     # Cards
     card1 = html.Div([
         html.H4("Imóveis filtrados"),
         html.P(f"Total: {len(dados)}"),
-        html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados")
+        html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados"),
+        html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados")
     ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222", "color": "#eee"})
 
     card2 = html.Div([
         html.H4("Previsão IPTU"),
-        html.P(f"2025: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", ".")),
-        html.P(f"2026: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", ".")),
-        html.P(f"2027: R$ {forecast_iptu.iloc[2]:,.0f}".replace(",", "."))
+        html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", ".")),
+        html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."))
     ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222", "color": "#eee"})
 
     card3 = html.Div([
         html.H4("Previsão ITBI"),
-        html.P(f"2025: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", ".")),
-        html.P(f"2026: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", ".")),
-        html.P(f"2027: R$ {forecast_itbi.iloc[2]:,.0f}".replace(",", "."))
+        html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", ".")),
+        html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."))
     ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222", "color": "#eee"})
 
     cards = [card1, card2, card3]
 
-    return mapa_html, fig_hist, fig_disp, cards
+    return mapa_html, fig_hist, cards
 
 if __name__ == "__main__":
     app.run_server(debug=True)
