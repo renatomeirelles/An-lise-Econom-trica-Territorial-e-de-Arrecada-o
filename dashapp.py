@@ -82,6 +82,18 @@ forecast_iptu = forecast_iptu * 1.2           # reajuste 20% em cada ano
 itbi_series = df_treino["ITBI"]
 model_itbi = ARIMA(itbi_series, order=(1,1,1)).fit()
 forecast_itbi = model_itbi.forecast(steps=2)  # apenas 2026 e 2027
+
+# =========================
+# Séries históricas formatadas (para uso no gráfico)
+# =========================
+iptu_hist = iptu_series.reset_index()
+iptu_hist.columns = ["Ano", "Valor"]
+iptu_hist["Indicador"] = "IPTU"
+
+itbi_hist = itbi_series.reset_index()
+itbi_hist.columns = ["Ano", "Valor"]
+itbi_hist["Indicador"] = "ITBI"
+
 # =========================
 # Gráfico IPTU+ITBI com previsão pontilhada apenas em 2026–2027
 # =========================
