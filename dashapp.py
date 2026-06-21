@@ -256,7 +256,7 @@ app.layout = html.Div([
         ], style={"flex": "1"})
     ], style={"display": "flex", "gap": "20px", "marginBottom": "20px"}),
 
-    # Cards resumo
+    # Cards resumo (logo abaixo dos filtros)
     html.Div(id="cards", style={"display": "flex", "gap": "20px", "margin": "20px 0"}),
 
     # Mapa + gráfico de distribuição lado a lado (ambos em cards escuros)
@@ -308,6 +308,40 @@ def atualizar_mapa(tipo, estilo):
     # Gráfico de distribuição de vendas (histograma)
     if len(dados) > 0:
         fig_hist = px.histogram(dados, x="Preço", nbins=30,
+                                title=f"Distribuição de Vendas - {tipo}")
+    else:
+        fig_hist = px.histogram(title="Sem dados para este filtro")
+
+    # Fundo escuro no histograma
+    fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
+
+    # Cards
+    card1 = html.Div([
+        html.H4("Imóveis filtrados", style={"color": "#eee"}),
+        html.P(f"Total: {len(dados)}", style={"color": "#eee"}),
+        html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"}),
+        html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"})
+    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
+
+    card2 = html.Div([
+        html.H4("Previsão IPTU", style={"color": "#eee"}),
+        html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
+        html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
+    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
+
+    card3 = html.Div([
+        html.H4("Previsão ITBI", style={"color": "#eee"}),
+        html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
+        html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
+    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
+
+    cards = [card1, card2, card3]
+
+    return mapa_html, fig_hist, cards
+
+if __name__ == "__main__":
+    app.run_server(debug=True)
+
                                 title=f"Distribuição de Vendas - {tipo}")
     else:
         fig_hist = px.histogram(title="Sem dados para este filtro")
