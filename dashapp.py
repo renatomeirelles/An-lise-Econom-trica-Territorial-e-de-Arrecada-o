@@ -7,10 +7,6 @@ import folium
 from folium.plugins import HeatMap, MarkerCluster
 import warnings
 from statsmodels.tsa.arima.model import ARIMA
-import locale
-
-# Configuração de locale para números brasileiros
-locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
 warnings.filterwarnings("ignore")
 
@@ -32,6 +28,7 @@ def _tiles_url(estilo_jawg="jawg-dark"):
 df_imoveis = pd.read_excel("data/imoveis_georreferenciados_novembro.xlsx")
 df_series = pd.read_excel("data/serie historica iptu itbi.xlsx")
 gdf_bairros = gpd.read_file("data/municipio_completo.shp")
+
 # =========================
 # Ajustes nos imóveis
 # =========================
