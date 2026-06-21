@@ -147,14 +147,16 @@ cores = ['#FF0000','#FFA500','#FFFF00','#00FF00','#00CED1','#0000FF','#8A2BE2','
 faixas_preco = [120000,300000,500000,800000,1000000,1500000,2500000,5000000,10500000]
 
 # =========================
-# Funções de mapa (com fundo escuro)
+# Funções de mapa (com fundo escuro reforçado)
 # =========================
 def _map_base(estilo_jawg="jawg-dark"):
     mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13,
                       tiles=_tiles_url(estilo_jawg), attr="Jawg Maps",
                       control_scale=False, prefer_canvas=True)
     # Forçar fundo escuro no HTML do mapa
-    mapa.get_root().html.add_child(folium.Element("<style>body {background-color:#222;}</style>"))
+    mapa.get_root().html.add_child(folium.Element(
+        "<style>html, body {background-color:#222 !important;}</style>"
+    ))
     return mapa
 
 def gerar_mapa_coropletico(dados, estilo_jawg="jawg-dark"):
@@ -256,14 +258,14 @@ app.layout = html.Div([
     ], style={"display": "flex", "gap": "20px", "marginBottom": "20px"}),
 
     # Linha de cards resumo (logo abaixo dos filtros e acima do mapa)
-    html.Div(id="cards", style={"display": "flex", "gap": "20px", "margin": "20px 0"}),
+    html.Div(id="cards", style={"margin": "20px 0"}),
 
-    # Mapa + gráfico de distribuição lado a lado (ambos em cards escuros)
+    # Mapa + gráfico de distribuição lado a lado
     html.Div([
         html.Div([
             html.Iframe(id="mapa", width="100%", height="600",
                         style={"border":"none","backgroundColor":"#222"})
-        ], style={"flex":"2","backgroundColor":"#222","padding":"10px","border":"1px solid #444"}),
+        ], style={"flex":"2"}),
 
         html.Div([
             dcc.Graph(id="grafico-precos",
@@ -271,7 +273,7 @@ app.layout = html.Div([
         ], style={"flex":"1","backgroundColor":"#222","padding":"10px","border":"1px solid #444"})
     ], style={"display":"flex","gap":"20px"}),
 
-    # Gráfico IPTU+ITBI (também em card escuro)
+    # Gráfico IPTU+ITBI
     html.Div([
         dcc.Graph(figure=fig_iptu_itbi,
                   style={"marginTop":"30px","backgroundColor":"#222"})
@@ -338,9 +340,11 @@ def atualizar_mapa(tipo, estilo):
         html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
     ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
 
-    cards = [card1, card2, card3]
+    cards = html.Div([card1, card2, card3],
+                     style={"display":"flex","gap":"20px","width":"100%"})
 
     return mapa_html, fig_hist, cards
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
