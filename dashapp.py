@@ -55,7 +55,6 @@ def calcular_stats(dados):
     media_municipio = dados["Preço"].mean()
     stats["variacao_vs_municipio"] = ((stats["preco_medio"] - media_municipio) / media_municipio) * 100
     return stats
-
 # =========================
 # Ajustes nas séries históricas
 # =========================
@@ -94,6 +93,20 @@ itbi_hist = itbi_series.reset_index()
 itbi_hist.columns = ["Ano", "Valor"]
 itbi_hist["Indicador"] = "ITBI"
 
+# =========================
+# Previsões formatadas (corrigido)
+# =========================
+iptu_forecast = pd.DataFrame({
+    "Ano": [2026, 2027],
+    "Valor": forecast_iptu.values,
+    "Indicador": "IPTU Previsão"
+})
+
+itbi_forecast = pd.DataFrame({
+    "Ano": [2026, 2027],
+    "Valor": forecast_itbi.values,
+    "Indicador": "ITBI Previsão"
+})
 # =========================
 # Gráfico IPTU+ITBI com previsão pontilhada apenas em 2026–2027
 # =========================
@@ -316,5 +329,3 @@ def atualizar_mapa(tipo, estilo):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
-
-
