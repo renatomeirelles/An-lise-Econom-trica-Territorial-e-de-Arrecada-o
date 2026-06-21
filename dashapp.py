@@ -7,15 +7,22 @@ import folium
 from folium.plugins import HeatMap, MarkerCluster
 
 app = dash.Dash(__name__)
-server = app.server   # ESSENCIAL para o Render
+server = app.server
+
+# =========================
+# Configuração Jawg
+# =========================
+JAWG_TOKEN = "ZK6EgfhFT6px8F8MsRfOp2S5aUMPOvNr5CEEtLmjOYjHDC2MzgI0ZJ1cJjj0C98Y"
+CENTRO_MARINGA = [-23.4205, -51.9331]
+
+def _tiles_url(estilo_jawg="jawg-dark"):
+    return f"https://tile.jawg.io/{estilo_jawg}/{{z}}/{{x}}/{{y}}{{r}}.png?access-token={JAWG_TOKEN}"
 
 # =========================
 # Carregar dados
 # =========================
 df_imoveis = pd.read_excel("data/imoveis_georreferenciados_novembro.xlsx")
 df_series = pd.read_excel("data/serie historica iptu itbi.xlsx")
-
-# Carregar shapefile dos bairros
 gdf_bairros = gpd.read_file("data/municipio_completo.shp")
 
 # =========================
@@ -25,7 +32,6 @@ df_imoveis["Preço"] = pd.to_numeric(df_imoveis["Preço"], errors="coerce")
 df_imoveis["Preço por m²"] = pd.to_numeric(df_imoveis["Preço por m²"], errors="coerce")
 df_imoveis = df_imoveis.dropna(subset=["Preço", "latitude", "longitude"])
 
-# Estatísticas por bairro e tipo
 def calcular_stats(dados):
     stats = dados.groupby("Bairro").agg(
         preco_medio=("Preço", "mean"),
@@ -35,12 +41,9 @@ def calcular_stats(dados):
         preco_m2_max=("Preço por m²", "max"),
         preco_m2_min=("Preço por m²", "min")
     ).reset_index()
-    # Variação percentual vs média do município
     media_municipio = dados["Preço"].mean()
     stats["variacao_vs_municipio"] = ((stats["preco_medio"] - media_municipio) / media_municipio) * 100
     return stats
-
-stats_bairros = calcular_stats(df_imoveis)
 
 # =========================
 # Ajustes nas séries históricas
@@ -61,82 +64,67 @@ fig_iptu_itbi = px.line(
 )
 
 # =========================
-# Função para gerar mapa Folium com Jawg
+# Funções de mapa
 # =========================
-def gerar_mapa(tipo="Todos", estilo="coropletico"):
-    # Fundo escuro da Jawg
-    mapa = folium.Map(
-        location=[-23.42, -51.93],
-        zoom_start=12,
-        tiles="https://tile.jawg.io/jawg-dark/{z}/{x}/{y}{r}.png?access-token=SEU_ACCESS_TOKEN_AQUI",
-        attr="Jawg Maps"
-    )
+def gerar_mapa_coropletico(estilo_jawg="jawg-dark"):
+    stats = calcular_stats(df_imoveis)
+    gdf_stats = gdf_bairros.merge(stats, left_on="NOME", right_on="Bairro", how="left")
+    mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13, tiles=_tiles_url(estilo_jawg), attr="Jawg Maps")
 
-    # Filtrar imóveis
-    if tipo != "Todos":
-        dados = df_imoveis[df_imoveis["Tipo"] == tipo]
-    else:
-        dados = df_imoveis
+    folium.Choropleth(
+        geo_data=gdf_stats,
+        data=gdf_stats,
+        columns=["NOME", "preco_medio"],
+        key_on="feature.properties.NOME",
+        fill_color="YlOrRd",
+        fill_opacity=0.7,
+        line_opacity=0.2,
+        legend_name="Preço médio dos imóveis"
+    ).add_to(mapa)
 
-    # Estatísticas filtradas
-    stats = calcular_stats(dados)
-    gdf_stats = gdf_bairros.merge(stats, on="Bairro", how="left")
-
-    # Coroplético
-    if estilo == "coropletico":
-        folium.Choropleth(
-            geo_data=gdf_stats,
-            data=gdf_stats,
-            columns=["Bairro", "preco_medio"],
-            key_on="feature.properties.Bairro",
-            fill_color="YlOrRd",
-            fill_opacity=0.7,
-            line_opacity=0.2,
-            legend_name="Preço médio dos imóveis"
-        ).add_to(mapa)
-
-        # Tooltips
-        for _, row in gdf_stats.iterrows():
-            if pd.notnull(row["preco_medio"]):
-                tooltip = folium.Tooltip(
-                    f"<b>{row['Bairro']}</b><br>"
-                    f"Médio: R$ {row['preco_medio']:.0f}<br>"
-                    f"Máx: R$ {row['preco_max']:.0f}<br>"
-                    f"Mín: R$ {row['preco_min']:.0f}<br>"
-                    f"Var vs município: {row['variacao_vs_municipio']:.1f}%<br>"
-                    f"M² médio: R$ {row['preco_m2_medio']:.0f}"
-                )
-                folium.GeoJson(row["geometry"], tooltip=tooltip).add_to(mapa)
-
-    # Pontos
-    elif estilo == "pontos":
-        for _, row in dados.iterrows():
-            folium.CircleMarker(
-                location=[row["latitude"], row["longitude"]],
-                radius=3,
-                popup=f"{row['Tipo']} - R$ {row['Preço']:,.0f}",
-                color="blue",
-                fill=True
-            ).add_to(mapa)
-
-    # Cluster
-    elif estilo == "cluster":
-        cluster = MarkerCluster().add_to(mapa)
-        for _, row in dados.iterrows():
-            folium.Marker(
-                location=[row["latitude"], row["longitude"]],
-                popup=f"{row['Tipo']} - R$ {row['Preço']:,.0f}"
-            ).add_to(cluster)
-
-    # Heatmap
-    elif estilo == "calor":
-        HeatMap(
-            data=dados[["latitude", "longitude"]].values.tolist(),
-            radius=6, blur=8, max_zoom=12
-        ).add_to(mapa)
+    for _, row in gdf_stats.iterrows():
+        if pd.notnull(row["preco_medio"]):
+            tooltip = folium.Tooltip(
+                f"<b>{row['NOME']}</b><br>"
+                f"Médio: R$ {row['preco_medio']:.0f}<br>"
+                f"Máx: R$ {row['preco_max']:.0f}<br>"
+                f"Mín: R$ {row['preco_min']:.0f}<br>"
+                f"Var vs município: {row['variacao_vs_municipio']:.1f}%<br>"
+                f"M² médio: R$ {row['preco_m2_medio']:.0f}"
+            )
+            folium.GeoJson(row["geometry"], tooltip=tooltip).add_to(mapa)
 
     return mapa._repr_html_()
 
+def gerar_mapa_pontos(estilo_jawg="jawg-dark"):
+    mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13, tiles=_tiles_url(estilo_jawg), attr="Jawg Maps")
+    for _, row in df_imoveis.iterrows():
+        folium.CircleMarker(
+            location=[row["latitude"], row["longitude"]],
+            radius=3,
+            color="#00aa55",
+            fill=True,
+            fill_color="#00aa55",
+            fill_opacity=0.7,
+            popup=f"{row['Tipo']} — R$ {row['Preço']:,.0f}"
+        ).add_to(mapa)
+    return mapa._repr_html_()
+
+def gerar_mapa_cluster(estilo_jawg="jawg-dark"):
+    mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13, tiles=_tiles_url(estilo_jawg), attr="Jawg Maps")
+    cluster = MarkerCluster(disableClusteringAtZoom=17).add_to(mapa)
+    for _, row in df_imoveis.iterrows():
+        folium.Marker(
+            location=[row["latitude"], row["longitude"]],
+            popup=f"{row['Tipo']} — R$ {row['Preço']:,.0f}"
+        ).add_to(cluster)
+    return mapa._repr_html_()
+
+def gerar_mapa_calor(estilo_jawg="jawg-dark"):
+    mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13, tiles=_tiles_url(estilo_jawg), attr="Jawg Maps")
+    heat_data = df_imoveis[['latitude', 'longitude']].dropna().values.tolist()
+    HeatMap(heat_data, radius=8, blur=10, max_zoom=18).add_to(mapa)
+    return mapa._repr_html_()
 # =========================
 # Layout
 # =========================
@@ -164,6 +152,9 @@ app.layout = html.Div([
         value="coropletico"
     ),
 
+    # Cards resumo
+    html.Div(id="cards", style={"display": "flex", "gap": "20px", "margin": "20px 0"}),
+
     # Mapa
     html.Iframe(id="mapa", width="100%", height="600"),
 
@@ -175,26 +166,58 @@ app.layout = html.Div([
 ])
 
 # =========================
-# Callbacks
+# Callback
 # =========================
 @app.callback(
     Output("mapa", "srcDoc"),
     Output("grafico-precos", "figure"),
+    Output("cards", "children"),
     Input("filtro-tipo", "value"),
     Input("filtro-estilo", "value")
 )
 def atualizar_mapa(tipo, estilo):
-    mapa_html = gerar_mapa(tipo, estilo)
-
-    # Atualizar histograma conforme filtro
-    if tipo != "Todos":
-        dados = df_imoveis[df_imoveis["Tipo"] == tipo]
+    # Escolher mapa
+    if estilo == "coropletico":
+        mapa_html = gerar_mapa_coropletico()
+    elif estilo == "pontos":
+        mapa_html = gerar_mapa_pontos()
+    elif estilo == "cluster":
+        mapa_html = gerar_mapa_cluster()
+    elif estilo == "calor":
+        mapa_html = gerar_mapa_calor()
     else:
-        dados = df_imoveis
+        mapa_html = gerar_mapa_coropletico()
 
-    fig_hist = px.histogram(dados, x="Preço", nbins=30, title=f"Distribuição de Preços - {tipo}")
+    # Filtrar dados para histograma
+    dados = df_imoveis if tipo == "Todos" else df_imoveis[df_imoveis["Tipo"] == tipo]
 
-    return mapa_html, fig_hist
+    if len(dados) > 0:
+        fig_hist = px.histogram(dados, x="Preço", nbins=30, title=f"Distribuição de Preços - {tipo}")
+    else:
+        fig_hist = px.histogram(title="Sem dados para este filtro")
+
+    # Cards
+    card1 = html.Div([
+        html.H4("Imóveis filtrados"),
+        html.P(f"Total: {len(dados)}"),
+        html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}" if len(dados) > 0 else "Sem dados")
+    ], style={"border": "1px solid #ccc", "padding": "10px", "flex": "1"})
+
+    card2 = html.Div([
+        html.H4("Previsão IPTU"),
+        html.P("2026: R$ 55.000.000"),
+        html.P("2027: R$ 60.000.000")
+    ], style={"border": "1px solid #ccc", "padding": "10px", "flex": "1"})
+
+    card3 = html.Div([
+        html.H4("Previsão ITBI"),
+        html.P("2026: R$ 22.000.000"),
+        html.P("2027: R$ 24.000.000")
+    ], style={"border": "1px solid #ccc", "padding": "10px", "flex": "1"})
+
+    cards = [card1, card2, card3]
+
+    return mapa_html, fig_hist, cards
 
 if __name__ == "__main__":
     app.run_server(debug=True)
