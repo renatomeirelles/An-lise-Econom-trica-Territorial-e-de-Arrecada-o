@@ -99,26 +99,27 @@ itbi_hist["Indicador"] = "ITBI"
 iptu_forecast = pd.DataFrame({
     "Ano": [2026, 2027],
     "Valor": forecast_iptu.values,
-    "Indicador": "IPTU Previsão"
+    "Indicador": "IPTU"
 })
 
 itbi_forecast = pd.DataFrame({
     "Ano": [2026, 2027],
     "Valor": forecast_itbi.values,
-    "Indicador": "ITBI Previsão"
+    "Indicador": "ITBI"
 })
 # =========================
-# Gráfico IPTU+ITBI com previsão contínua (sem gap)
+# Gráfico IPTU+ITBI contínuo (sem gap)
 # =========================
 
-# Concatenar histórico + previsão para IPTU
+# Concatenar histórico + previsão em uma única série para cada indicador
 iptu_full = pd.concat([iptu_hist, iptu_forecast], ignore_index=True)
-
-# Concatenar histórico + previsão para ITBI
 itbi_full = pd.concat([itbi_hist, itbi_forecast], ignore_index=True)
 
+# Juntar tudo em um único DataFrame
+df_full = pd.concat([iptu_full, itbi_full], ignore_index=True)
+
 fig_iptu_itbi = px.line(
-    pd.concat([iptu_full, itbi_full], ignore_index=True),
+    df_full,
     x="Ano",
     y="Valor",
     color="Indicador",
@@ -126,23 +127,15 @@ fig_iptu_itbi = px.line(
     title="Evolução Histórica e Previsões IPTU e ITBI (2026–2027)"
 )
 
-# Ajustar estilo das linhas: sólido até 2025, pontilhado em 2026–2027
-fig_iptu_itbi.update_traces(
-    selector=dict(name="IPTU"),
-    line=dict(dash="solid")
-)
-fig_iptu_itbi.update_traces(
-    selector=dict(name="IPTU Previsão"),
-    line=dict(dash="dash")
-)
-fig_iptu_itbi.update_traces(
-    selector=dict(name="ITBI"),
-    line=dict(dash="solid")
-)
-fig_iptu_itbi.update_traces(
-    selector=dict(name="ITBI Previsão"),
-    line=dict(dash="dash")
-)
+# Estilo das linhas: sólido até 2025, pontilhado a partir de 2026
+for indicador in ["IPTU", "ITBI"]:
+    fig_iptu_itbi.add_scatter(
+        x=df_full[df_full["Ano"] >= 2026]["Ano"],
+        y=df_full[(df_full["Ano"] >= 2026) & (df_full["Indicador"] == indicador)]["Valor"],
+        mode="lines+markers",
+        name=f"{indicador} Previsão",
+        line=dict(dash="dash")
+    )
 
 fig_iptu_itbi.update_xaxes(dtick=1)
 fig_iptu_itbi.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
@@ -154,14 +147,20 @@ cores = ['#FF0000','#FFA500','#FFFF00','#00FF00','#00CED1','#0000FF','#8A2BE2','
 faixas_preco = [120000,300000,500000,800000,1000000,1500000,2500000,5000000,10500000]
 
 # =========================
-# Funções de mapa (corrigido para fundo escuro)
+# Funções de mapa (com fundo escuro)
 # =========================
-def gerar_mapa_coropletico(dados, estilo_jawg="jawg-dark"):
-    stats = calcular_stats(dados)
-    gdf_stats = gdf_bairros.merge(stats, left_on="NOME", right_on="Bairro", how="left")
+def _map_base(estilo_jawg="jawg-dark"):
     mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13,
                       tiles=_tiles_url(estilo_jawg), attr="Jawg Maps",
                       control_scale=False, prefer_canvas=True)
+    # Forçar fundo escuro no HTML do mapa
+    mapa.get_root().html.add_child(folium.Element("<style>body {background-color:#222;}</style>"))
+    return mapa
+
+def gerar_mapa_coropletico(dados, estilo_jawg="jawg-dark"):
+    stats = calcular_stats(dados)
+    gdf_stats = gdf_bairros.merge(stats, left_on="NOME", right_on="Bairro", how="left")
+    mapa = _map_base(estilo_jawg)
 
     for _, row in gdf_stats.iterrows():
         valor = row["preco_medio"]
@@ -189,9 +188,7 @@ def gerar_mapa_coropletico(dados, estilo_jawg="jawg-dark"):
 
 def gerar_mapa_pontos(dados, estilo_jawg="jawg-dark"):
     dados = dados.sample(min(len(dados), 2000))  # limita para performance
-    mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13,
-                      tiles=_tiles_url(estilo_jawg), attr="Jawg Maps",
-                      control_scale=False, prefer_canvas=True)
+    mapa = _map_base(estilo_jawg)
     for _, row in dados.iterrows():
         folium.CircleMarker(
             location=[row["latitude"], row["longitude"]],
@@ -206,9 +203,7 @@ def gerar_mapa_pontos(dados, estilo_jawg="jawg-dark"):
 
 def gerar_mapa_cluster(dados, estilo_jawg="jawg-dark"):
     dados = dados.sample(min(len(dados), 2000))
-    mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13,
-                      tiles=_tiles_url(estilo_jawg), attr="Jawg Maps",
-                      control_scale=False, prefer_canvas=True)
+    mapa = _map_base(estilo_jawg)
     cluster = MarkerCluster(disableClusteringAtZoom=17).add_to(mapa)
     for _, row in dados.iterrows():
         folium.Marker(
@@ -219,9 +214,7 @@ def gerar_mapa_cluster(dados, estilo_jawg="jawg-dark"):
 
 def gerar_mapa_calor(dados, estilo_jawg="jawg-dark"):
     heat_data = dados[['latitude', 'longitude']].values.tolist()
-    mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13,
-                      tiles=_tiles_url(estilo_jawg), attr="Jawg Maps",
-                      control_scale=False, prefer_canvas=True)
+    mapa = _map_base(estilo_jawg)
     HeatMap(heat_data, radius=10, blur=12, max_zoom=18).add_to(mapa)
     return mapa._repr_html_()
 # =========================
@@ -351,4 +344,3 @@ def atualizar_mapa(tipo, estilo):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
-
