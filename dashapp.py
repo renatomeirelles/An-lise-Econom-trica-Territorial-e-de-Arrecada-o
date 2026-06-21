@@ -272,7 +272,7 @@ app.layout = html.Div([
         ], style={"flex":"1","backgroundColor":"#222","padding":"10px","border":"1px solid #444"})
     ], style={"display":"flex","gap":"20px"}),
 
-    # Gráfico IPTU+ITBI + previsões
+    # Gráfico IPTU+ITBI + previsões logo abaixo
     html.Div([
         dcc.Graph(figure=fig_iptu_itbi,
                   style={"marginTop":"30px","backgroundColor":"#222"}),
