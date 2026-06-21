@@ -5,6 +5,10 @@ import pandas as pd
 import geopandas as gpd
 import folium
 from folium.plugins import HeatMap, MarkerCluster
+import warnings
+from statsmodels.tsa.arima.model import ARIMA
+
+warnings.filterwarnings("ignore")
 
 app = dash.Dash(__name__)
 server = app.server
@@ -24,7 +28,6 @@ def _tiles_url(estilo_jawg="jawg-dark"):
 df_imoveis = pd.read_excel("data/imoveis_georreferenciados_novembro.xlsx")
 df_series = pd.read_excel("data/serie historica iptu itbi.xlsx")
 gdf_bairros = gpd.read_file("data/municipio_completo.shp")
-
 # =========================
 # Ajustes nos imóveis
 # =========================
@@ -54,14 +57,50 @@ df_series = df_series.rename(columns={"index": "Ano"})
 df_series["Ano"] = pd.to_numeric(df_series["Ano"], errors="coerce")
 df_series["Valor"] = pd.to_numeric(df_series["Valor"].astype(str).str.replace(",", "."), errors="coerce")
 df_series = df_series[df_series["Indicador"].isin(["IPTU", "ITBI"])]
+
 # =========================
-# Gráfico único IPTU + ITBI
+# ARIMA previsões IPTU e ITBI
 # =========================
+df_final = df_series.pivot(index="Ano", columns="Indicador", values="Valor").dropna()
+
+# IPTU
+iptu_series = df_final["IPTU"]
+model_iptu = ARIMA(iptu_series, order=(1,1,1)).fit()
+forecast_iptu = model_iptu.forecast(steps=2)
+forecast_iptu = forecast_iptu * 1.3  # reajuste 30%
+
+# ITBI
+itbi_series = df_final["ITBI"]
+model_itbi = ARIMA(itbi_series, order=(1,1,1)).fit()
+forecast_itbi = model_itbi.forecast(steps=2)
+
+# =========================
+# Gráfico IPTU+ITBI com previsões
+# =========================
+df_plot = df_final.reset_index()
+df_plot = df_plot.melt(id_vars="Ano", var_name="Indicador", value_name="Valor")
+
+# adicionar previsões
+df_forecast = pd.DataFrame({
+    "Ano": [2026, 2027, 2026, 2027],
+    "Indicador": ["IPTU","IPTU","ITBI","ITBI"],
+    "Valor": [forecast_iptu.iloc[0], forecast_iptu.iloc[1],
+              forecast_itbi.iloc[0], forecast_itbi.iloc[1]],
+    "Tipo": "Previsão"
+})
+df_plot["Tipo"] = "Histórico"
+df_plot = pd.concat([df_plot, df_forecast])
+
 fig_iptu_itbi = px.line(
-    df_series,
-    x="Ano", y="Valor", color="Indicador",
-    title="Evolução Histórica IPTU e ITBI"
+    df_plot, x="Ano", y="Valor", color="Indicador", line_dash="Tipo",
+    title="Evolução Histórica e Previsões IPTU e ITBI"
 )
+
+# =========================
+# Paleta e faixas para coroplético
+# =========================
+cores = ['#FF0000','#FFA500','#FFFF00','#00FF00','#00CED1','#0000FF','#8A2BE2','#FF69B4']
+faixas_preco = [120000,300000,500000,800000,1000000,1500000,2500000,5000000,10500000]
 
 # =========================
 # Funções de mapa
@@ -71,28 +110,27 @@ def gerar_mapa_coropletico(estilo_jawg="jawg-dark"):
     gdf_stats = gdf_bairros.merge(stats, left_on="NOME", right_on="Bairro", how="left")
     mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13, tiles=_tiles_url(estilo_jawg), attr="Jawg Maps")
 
-    folium.Choropleth(
-        geo_data=gdf_stats,
-        data=gdf_stats,
-        columns=["NOME", "preco_medio"],
-        key_on="feature.properties.NOME",
-        fill_color="YlOrRd",
-        fill_opacity=0.7,
-        line_opacity=0.2,
-        legend_name="Preço médio dos imóveis"
-    ).add_to(mapa)
-
     for _, row in gdf_stats.iterrows():
-        if pd.notnull(row["preco_medio"]):
-            tooltip = folium.Tooltip(
-                f"<b>{row['NOME']}</b><br>"
-                f"Médio: R$ {row['preco_medio']:.0f}<br>"
-                f"Máx: R$ {row['preco_max']:.0f}<br>"
-                f"Mín: R$ {row['preco_min']:.0f}<br>"
-                f"Var vs município: {row['variacao_vs_municipio']:.1f}%<br>"
-                f"M² médio: R$ {row['preco_m2_medio']:.0f}"
-            )
-            folium.GeoJson(row["geometry"], tooltip=tooltip).add_to(mapa)
+        valor = row["preco_medio"]
+        cor = "#D3D3D3"
+        if pd.notnull(valor):
+            for i in range(len(faixas_preco)-1):
+                if faixas_preco[i] <= valor <= faixas_preco[i+1]:
+                    cor = cores[i]
+                    break
+        tooltip = folium.Tooltip(
+            f"<b>{row['NOME']}</b><br>"
+            f"Médio: R$ {row['preco_medio']:.0f}<br>"
+            f"Máx: R$ {row['preco_max']:.0f}<br>"
+            f"Mín: R$ {row['preco_min']:.0f}<br>"
+            f"Var vs município: {row['variacao_vs_municipio']:.1f}%<br>"
+            f"M² médio: R$ {row['preco_m2_medio']:.0f}"
+        )
+        folium.GeoJson(row["geometry"],
+            style_function=lambda feature, color=cor: {
+                'fillColor': color, 'color': 'white', 'weight': 1, 'fillOpacity': 0.6
+            },
+            tooltip=tooltip).add_to(mapa)
 
     return mapa._repr_html_()
 
@@ -101,7 +139,7 @@ def gerar_mapa_pontos(estilo_jawg="jawg-dark"):
     for _, row in df_imoveis.iterrows():
         folium.CircleMarker(
             location=[row["latitude"], row["longitude"]],
-            radius=3,
+            radius=2,
             color="#00aa55",
             fill=True,
             fill_color="#00aa55",
@@ -123,7 +161,7 @@ def gerar_mapa_cluster(estilo_jawg="jawg-dark"):
 def gerar_mapa_calor(estilo_jawg="jawg-dark"):
     mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13, tiles=_tiles_url(estilo_jawg), attr="Jawg Maps")
     heat_data = df_imoveis[['latitude', 'longitude']].dropna().values.tolist()
-    HeatMap(heat_data, radius=8, blur=10, max_zoom=18).add_to(mapa)
+    HeatMap(heat_data, radius=10, blur=12, max_zoom=18).add_to(mapa)
     return mapa._repr_html_()
 # =========================
 # Layout
@@ -205,14 +243,14 @@ def atualizar_mapa(tipo, estilo):
 
     card2 = html.Div([
         html.H4("Previsão IPTU"),
-        html.P("2026: R$ 55.000.000"),
-        html.P("2027: R$ 60.000.000")
+        html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}"),
+        html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}")
     ], style={"border": "1px solid #ccc", "padding": "10px", "flex": "1"})
 
     card3 = html.Div([
         html.H4("Previsão ITBI"),
-        html.P("2026: R$ 22.000.000"),
-        html.P("2027: R$ 24.000.000")
+        html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}"),
+        html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}")
     ], style={"border": "1px solid #ccc", "padding": "10px", "flex": "1"})
 
     cards = [card1, card2, card3]
