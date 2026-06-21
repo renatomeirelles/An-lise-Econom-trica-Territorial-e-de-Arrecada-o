@@ -117,8 +117,14 @@ iptu_full = pd.concat([iptu_hist, iptu_forecast], ignore_index=True)
 # Concatenar histórico + previsão para ITBI
 itbi_full = pd.concat([itbi_hist, itbi_forecast], ignore_index=True)
 
-fig_iptu_itbi = px.line(iptu_full, x="Ano", y="Valor", color="Indicador",
-                        markers=True, title="Evolução Histórica e Previsões IPTU e ITBI (2026–2027)")
+fig_iptu_itbi = px.line(
+    pd.concat([iptu_full, itbi_full], ignore_index=True),
+    x="Ano",
+    y="Valor",
+    color="Indicador",
+    markers=True,
+    title="Evolução Histórica e Previsões IPTU e ITBI (2026–2027)"
+)
 
 # Ajustar estilo das linhas: sólido até 2025, pontilhado em 2026–2027
 fig_iptu_itbi.update_traces(
@@ -307,42 +313,12 @@ def atualizar_mapa(tipo, estilo):
 
     # Gráfico de distribuição de vendas (histograma)
     if len(dados) > 0:
-        fig_hist = px.histogram(dados, x="Preço", nbins=30,
-                                title=f"Distribuição de Vendas - {tipo}")
-    else:
-        fig_hist = px.histogram(title="Sem dados para este filtro")
-
-    # Fundo escuro no histograma
-    fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
-
-    # Cards
-    card1 = html.Div([
-        html.H4("Imóveis filtrados", style={"color": "#eee"}),
-        html.P(f"Total: {len(dados)}", style={"color": "#eee"}),
-        html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"}),
-        html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"})
-    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
-
-    card2 = html.Div([
-        html.H4("Previsão IPTU", style={"color": "#eee"}),
-        html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
-        html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
-
-    card3 = html.Div([
-        html.H4("Previsão ITBI", style={"color": "#eee"}),
-        html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
-        html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
-
-    cards = [card1, card2, card3]
-
-    return mapa_html, fig_hist, cards
-
-if __name__ == "__main__":
-    app.run_server(debug=True)
-
-                                title=f"Distribuição de Vendas - {tipo}")
+        fig_hist = px.histogram(
+            dados,
+            x="Preço",
+            nbins=30,
+            title=f"Distribuição de Vendas - {tipo}"
+        )
     else:
         fig_hist = px.histogram(title="Sem dados para este filtro")
 
