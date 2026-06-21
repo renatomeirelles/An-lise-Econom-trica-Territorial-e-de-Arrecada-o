@@ -192,23 +192,24 @@ def gerar_mapa_calor(dados, estilo_jawg="jawg-dark"):
 # =========================
 app.layout = html.Div([
     html.H1("Inteligência Fiscal e Territorial - Modelagem Econométrica — Maringá",
-            style={"textAlign": "center", "marginBottom": "30px"}),
+            style={"textAlign": "center", "marginBottom": "30px", "color": "#eee"}),
 
     # Filtros
     html.Div([
         html.Div([
-            html.Label("Tipo de imóvel:"),
+            html.Label("Tipo de imóvel:", style={"color": "#eee"}),
             dcc.Dropdown(
                 id="filtro-tipo",
                 options=[{"label": "Todos", "value": "Todos"}] +
                         [{"label": t, "value": t} for t in df_imoveis["Tipo"].unique()],
                 value="Todos",
-                clearable=False   # mantém o valor visível
+                clearable=False,
+                style={"color": "#000"}
             )
         ], style={"flex": "1"}),
 
         html.Div([
-            html.Label("Estilo do mapa:"),
+            html.Label("Estilo do mapa:", style={"color": "#eee"}),
             dcc.Dropdown(
                 id="filtro-estilo",
                 options=[
@@ -218,7 +219,8 @@ app.layout = html.Div([
                     {"label": "Calor", "value": "calor"}
                 ],
                 value="coropletico",
-                clearable=False   # mantém o valor visível
+                clearable=False,
+                style={"color": "#000"}
             )
         ], style={"flex": "1"})
     ], style={"display": "flex", "gap": "20px", "marginBottom": "20px"}),
@@ -228,12 +230,13 @@ app.layout = html.Div([
 
     # Mapa + gráfico de distribuição lado a lado
     html.Div([
-        html.Iframe(id="mapa", width="65%", height="600", style={"border": "1px solid #444"}),
-        dcc.Graph(id="grafico-precos", style={"width": "35%", "height": "600px"})
+        html.Iframe(id="mapa", width="65%", height="600",
+                    style={"border": "1px solid #444", "backgroundColor": "#222"}),
+        dcc.Graph(id="grafico-precos", style={"width": "35%", "height": "600px", "backgroundColor": "#222"})
     ], style={"display": "flex", "gap": "20px"}),
 
     # Gráfico IPTU+ITBI
-    dcc.Graph(figure=fig_iptu_itbi, style={"marginTop": "30px"})
+    dcc.Graph(figure=fig_iptu_itbi, style={"marginTop": "30px", "backgroundColor": "#222"})
 ])
 
 # =========================
@@ -266,28 +269,30 @@ def atualizar_mapa(tipo, estilo):
     if len(dados) > 0:
         fig_hist = px.histogram(dados, x="Preço", nbins=30,
                                 title=f"Distribuição de Vendas - {tipo}")
+        fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
     else:
         fig_hist = px.histogram(title="Sem dados para este filtro")
+        fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
 
     # Cards
     card1 = html.Div([
-        html.H4("Imóveis filtrados"),
-        html.P(f"Total: {len(dados)}"),
-        html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados"),
-        html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados")
-    ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222", "color": "#eee"})
+        html.H4("Imóveis filtrados", style={"color": "#eee"}),
+        html.P(f"Total: {len(dados)}", style={"color": "#eee"}),
+        html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"}),
+        html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"})
+    ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222"})
 
     card2 = html.Div([
-        html.H4("Previsão IPTU"),
-        html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", ".")),
-        html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."))
-    ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222", "color": "#eee"})
+        html.H4("Previsão IPTU", style={"color": "#eee"}),
+        html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
+        html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
+    ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222"})
 
     card3 = html.Div([
-        html.H4("Previsão ITBI"),
-        html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", ".")),
-        html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."))
-    ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222", "color": "#eee"})
+        html.H4("Previsão ITBI", style={"color": "#eee"}),
+        html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
+        html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
+    ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222"})
 
     cards = [card1, card2, card3]
 
@@ -295,3 +300,4 @@ def atualizar_mapa(tipo, estilo):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
