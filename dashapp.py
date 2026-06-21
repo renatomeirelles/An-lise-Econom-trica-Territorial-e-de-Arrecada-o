@@ -262,7 +262,7 @@ app.layout = html.Div([
         ], style={"flex": "1"})
     ], style={"display": "flex", "gap": "20px", "marginBottom": "20px"}),
 
-    # Cards resumo (logo abaixo dos filtros)
+    # Linha de cards resumo (logo abaixo dos filtros e acima do mapa)
     html.Div(id="cards", style={"display": "flex", "gap": "20px", "margin": "20px 0"}),
 
     # Mapa + gráfico de distribuição lado a lado (ambos em cards escuros)
@@ -351,3 +351,4 @@ def atualizar_mapa(tipo, estilo):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
