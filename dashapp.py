@@ -83,47 +83,27 @@ itbi_series = df_treino["ITBI"]
 model_itbi = ARIMA(itbi_series, order=(1,1,1)).fit()
 forecast_itbi = model_itbi.forecast(steps=2)  # apenas 2026 e 2027
 # =========================
-# Gráfico IPTU+ITBI contínuo (sem gap, até 2027)
+# Gráfico IPTU+ITBI com previsão pontilhada apenas em 2026–2027
 # =========================
 
-# Série contínua IPTU
-iptu_full = pd.concat([
-    iptu_series.reset_index().rename(columns={"IPTU":"Valor"}),
-    pd.DataFrame({"Ano":[2026,2027],"Valor":[forecast_iptu.iloc[0],forecast_iptu.iloc[1]]})
-])
-iptu_full["Indicador"] = "IPTU"
-iptu_full["Tipo"] = ["Histórico"]*(len(iptu_full)-2) + ["Previsão","Previsão"]
+# IPTU histórico
+fig_iptu_itbi = px.line(iptu_hist, x="Ano", y="Valor", color="Indicador",
+                        markers=True, title="Evolução Histórica e Previsões IPTU e ITBI (2026–2027)")
 
-# Série contínua ITBI
-itbi_full = pd.concat([
-    itbi_series.reset_index().rename(columns={"ITBI":"Valor"}),
-    pd.DataFrame({"Ano":[2026,2027],"Valor":[forecast_itbi.iloc[0],forecast_itbi.iloc[1]]})
-])
-itbi_full["Indicador"] = "ITBI"
-itbi_full["Tipo"] = ["Histórico"]*(len(itbi_full)-2) + ["Previsão","Previsão"]
+# Adicionar IPTU previsão (pontilhado)
+fig_iptu_itbi.add_scatter(x=iptu_forecast["Ano"], y=iptu_forecast["Valor"],
+                          mode="lines+markers", name="IPTU Previsão",
+                          line=dict(dash="dash"))
 
-# Concatenar
-df_plot = pd.concat([iptu_full, itbi_full])
+# Adicionar ITBI histórico
+fig_iptu_itbi.add_scatter(x=itbi_hist["Ano"], y=itbi_hist["Valor"],
+                          mode="lines+markers", name="ITBI Histórico",
+                          line=dict(dash="solid"))
 
-# Gráfico
-fig_iptu_itbi = px.line(
-    df_plot, x="Ano", y="Valor", color="Indicador",
-    markers=True, title="Evolução Histórica e Previsões IPTU e ITBI (2026–2027)"
-)
-
-# Linha sólida até 2025, pontilhada em 2026–2027
-for ind in ["IPTU","ITBI"]:
-    fig_iptu_itbi.update_traces(
-        selector=dict(name=ind),
-        line=dict(dash="solid")
-    )
-# Agora aplicamos dash apenas nos pontos de previsão
-for i, row in df_plot.iterrows():
-    if row["Tipo"]=="Previsão":
-        fig_iptu_itbi.update_traces(
-            selector=dict(name=row["Indicador"]),
-            line=dict(dash="dash")
-        )
+# Adicionar ITBI previsão (pontilhado)
+fig_iptu_itbi.add_scatter(x=itbi_forecast["Ano"], y=itbi_forecast["Valor"],
+                          mode="lines+markers", name="ITBI Previsão",
+                          line=dict(dash="dash"))
 
 fig_iptu_itbi.update_xaxes(dtick=1)
 fig_iptu_itbi.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
@@ -246,20 +226,20 @@ app.layout = html.Div([
     html.Div([
         html.Div([
             html.Iframe(id="mapa", width="100%", height="600",
-                        style={"border":"1px solid #444","backgroundColor":"#222"})
-        ], style={"flex":"2","backgroundColor":"#222","padding":"10px"}),
+                        style={"border":"none","backgroundColor":"#222"})
+        ], style={"flex":"2","backgroundColor":"#222","padding":"10px","border":"1px solid #444"}),
 
         html.Div([
             dcc.Graph(id="grafico-precos",
                       style={"height":"600px","backgroundColor":"#222"})
-        ], style={"flex":"1","backgroundColor":"#222","padding":"10px"})
+        ], style={"flex":"1","backgroundColor":"#222","padding":"10px","border":"1px solid #444"})
     ], style={"display":"flex","gap":"20px"}),
 
     # Gráfico IPTU+ITBI (também em card escuro)
     html.Div([
         dcc.Graph(figure=fig_iptu_itbi,
                   style={"marginTop":"30px","backgroundColor":"#222"})
-    ], style={"backgroundColor":"#222","padding":"10px","marginTop":"20px"})
+    ], style={"backgroundColor":"#222","padding":"10px","marginTop":"20px","border":"1px solid #444"})
 ])
 
 # =========================
@@ -304,13 +284,13 @@ def atualizar_mapa(tipo, estilo):
         html.P(f"Total: {len(dados)}", style={"color": "#eee"}),
         html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"}),
         html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"})
-    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
+    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
 
     card2 = html.Div([
         html.H4("Previsão IPTU", style={"color": "#eee"}),
         html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
         html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
+    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
 
     card3 = html.Div([
         html.H4("Previsão ITBI", style={"color": "#eee"}),
@@ -324,4 +304,5 @@ def atualizar_mapa(tipo, estilo):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
 
