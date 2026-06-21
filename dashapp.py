@@ -324,17 +324,17 @@ def atualizar_mapa(tipo, estilo):
             html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color":"#eee"})
         ])
 
-        # Previsões (abaixo do gráfico IPTU/ITBI) usando iptu_forecast e itbi_forecast
+        # Previsões (abaixo do gráfico IPTU/ITBI) usando os DataFrames formatados
         previsao_iptu = html.Div([
             html.H4("Previsão IPTU", style={"color":"#eee"}),
-            html.P(f"2026: R$ {iptu_forecast.loc[iptu_forecast['Ano']==2026,'Valor'].values[0]:,.0f}".replace(",", "."), style={"color":"#eee"}),
-            html.P(f"2027: R$ {iptu_forecast.loc[iptu_forecast['Ano']==2027,'Valor'].values[0]:,.0f}".replace(",", "."), style={"color":"#eee"})
+            html.P(f"2026: R$ {iptu_forecast[iptu_forecast['Ano']==2026]['Valor'].values[0]:,.0f}".replace(",", "."), style={"color":"#eee"}),
+            html.P(f"2027: R$ {iptu_forecast[iptu_forecast['Ano']==2027]['Valor'].values[0]:,.0f}".replace(",", "."), style={"color":"#eee"})
         ], style={"backgroundColor":"#222","padding":"15px","flex":"1","border":"1px solid #444"}),
 
         previsao_itbi = html.Div([
             html.H4("Previsão ITBI", style={"color":"#eee"}),
-            html.P(f"2026: R$ {itbi_forecast.loc[itbi_forecast['Ano']==2026,'Valor'].values[0]:,.0f}".replace(",", "."), style={"color":"#eee"}),
-            html.P(f"2027: R$ {itbi_forecast.loc[itbi_forecast['Ano']==2027,'Valor'].values[0]:,.0f}".replace(",", "."), style={"color":"#eee"})
+            html.P(f"2026: R$ {itbi_forecast[itbi_forecast['Ano']==2026]['Valor'].values[0]:,.0f}".replace(",", "."), style={"color":"#eee"}),
+            html.P(f"2027: R$ {itbi_forecast[itbi_forecast['Ano']==2027]['Valor'].values[0]:,.0f}".replace(",", "."), style={"color":"#eee"})
         ], style={"backgroundColor":"#222","padding":"15px","flex":"1","border":"1px solid #444"})
 
         return mapa_html, fig_hist, resumo, [previsao_iptu, previsao_itbi]
@@ -348,4 +348,3 @@ def atualizar_mapa(tipo, estilo):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
-
