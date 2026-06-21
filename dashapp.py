@@ -284,7 +284,6 @@ app.layout = html.Div([
 # Callback
 # =========================
 @app.callback(
-    @app.callback(
     Output("mapa", "srcDoc"),
     Output("grafico-precos", "figure"),
     Output("cards", "children"),
@@ -315,7 +314,7 @@ def atualizar_mapa(tipo, estilo):
             fig_hist = px.histogram(title="Sem dados para este filtro")
         fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
 
-        # Três cards horizontais
+        # Cards horizontais
         card1 = html.Div([
             html.H4("Imóveis filtrados", style={"color": "#eee"}),
             html.P(f"Total: {len(dados)}", style={"color": "#eee"}),
@@ -335,9 +334,7 @@ def atualizar_mapa(tipo, estilo):
             html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
         ], style={"backgroundColor":"#222","padding":"20px","flex":"1","border":"1px solid #444"})
 
-        # Retorna os três cards lado a lado
-        cards = html.Div([card1, card2, card3],
-                         style={"display":"flex","gap":"20px","width":"100%"})
+        cards = [card1, card2, card3]
 
         return mapa_html, fig_hist, cards
 
@@ -350,5 +347,6 @@ def atualizar_mapa(tipo, estilo):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
 
 
