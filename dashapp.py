@@ -83,47 +83,50 @@ itbi_series = df_treino["ITBI"]
 model_itbi = ARIMA(itbi_series, order=(1,1,1)).fit()
 forecast_itbi = model_itbi.forecast(steps=2)  # apenas 2026 e 2027
 # =========================
-# Gráfico IPTU+ITBI com previsões (sem gap, até 2027)
+# Gráfico IPTU+ITBI contínuo (sem gap, até 2027)
 # =========================
 
-# Construir série contínua para IPTU
-iptu_hist = iptu_series.reset_index()
-iptu_hist.columns = ["Ano", "Valor"]
-iptu_hist["Indicador"] = "IPTU"
-iptu_hist["Tipo"] = "Histórico"
+# Série contínua IPTU
+iptu_full = pd.concat([
+    iptu_series.reset_index().rename(columns={"IPTU":"Valor"}),
+    pd.DataFrame({"Ano":[2026,2027],"Valor":[forecast_iptu.iloc[0],forecast_iptu.iloc[1]]})
+])
+iptu_full["Indicador"] = "IPTU"
+iptu_full["Tipo"] = ["Histórico"]*(len(iptu_full)-2) + ["Previsão","Previsão"]
 
-iptu_forecast = pd.DataFrame({
-    "Ano": [2026, 2027],
-    "Valor": [forecast_iptu.iloc[0], forecast_iptu.iloc[1]],
-    "Indicador": "IPTU",
-    "Tipo": "Previsão"
-})
+# Série contínua ITBI
+itbi_full = pd.concat([
+    itbi_series.reset_index().rename(columns={"ITBI":"Valor"}),
+    pd.DataFrame({"Ano":[2026,2027],"Valor":[forecast_itbi.iloc[0],forecast_itbi.iloc[1]]})
+])
+itbi_full["Indicador"] = "ITBI"
+itbi_full["Tipo"] = ["Histórico"]*(len(itbi_full)-2) + ["Previsão","Previsão"]
 
-# Construir série contínua para ITBI
-itbi_hist = itbi_series.reset_index()
-itbi_hist.columns = ["Ano", "Valor"]
-itbi_hist["Indicador"] = "ITBI"
-itbi_hist["Tipo"] = "Histórico"
+# Concatenar
+df_plot = pd.concat([iptu_full, itbi_full])
 
-itbi_forecast = pd.DataFrame({
-    "Ano": [2026, 2027],
-    "Valor": [forecast_itbi.iloc[0], forecast_itbi.iloc[1]],
-    "Indicador": "ITBI",
-    "Tipo": "Previsão"
-})
-
-# Concatenar tudo
-df_plot = pd.concat([iptu_hist, iptu_forecast, itbi_hist, itbi_forecast])
-
-# Gráfico contínuo: linha sólida até 2025, pontilhada em 2026–2027
+# Gráfico
 fig_iptu_itbi = px.line(
     df_plot, x="Ano", y="Valor", color="Indicador",
-    line_dash="Tipo", markers=True,
-    title="Evolução Histórica e Previsões IPTU e ITBI (2026–2027)"
+    markers=True, title="Evolução Histórica e Previsões IPTU e ITBI (2026–2027)"
 )
 
-# Forçar ordem cronológica sem buraco
+# Linha sólida até 2025, pontilhada em 2026–2027
+for ind in ["IPTU","ITBI"]:
+    fig_iptu_itbi.update_traces(
+        selector=dict(name=ind),
+        line=dict(dash="solid")
+    )
+# Agora aplicamos dash apenas nos pontos de previsão
+for i, row in df_plot.iterrows():
+    if row["Tipo"]=="Previsão":
+        fig_iptu_itbi.update_traces(
+            selector=dict(name=row["Indicador"]),
+            line=dict(dash="dash")
+        )
+
 fig_iptu_itbi.update_xaxes(dtick=1)
+fig_iptu_itbi.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
 
 # =========================
 # Paleta e faixas para coroplético
@@ -239,15 +242,24 @@ app.layout = html.Div([
     # Cards resumo
     html.Div(id="cards", style={"display": "flex", "gap": "20px", "margin": "20px 0"}),
 
-    # Mapa + gráfico de distribuição lado a lado
+    # Mapa + gráfico de distribuição lado a lado (ambos em cards escuros)
     html.Div([
-        html.Iframe(id="mapa", width="65%", height="600",
-                    style={"border": "1px solid #444", "backgroundColor": "#222"}),
-        dcc.Graph(id="grafico-precos", style={"width": "35%", "height": "600px", "backgroundColor": "#222"})
-    ], style={"display": "flex", "gap": "20px"}),
+        html.Div([
+            html.Iframe(id="mapa", width="100%", height="600",
+                        style={"border":"1px solid #444","backgroundColor":"#222"})
+        ], style={"flex":"2","backgroundColor":"#222","padding":"10px"}),
 
-    # Gráfico IPTU+ITBI
-    dcc.Graph(figure=fig_iptu_itbi, style={"marginTop": "30px", "backgroundColor": "#222"})
+        html.Div([
+            dcc.Graph(id="grafico-precos",
+                      style={"height":"600px","backgroundColor":"#222"})
+        ], style={"flex":"1","backgroundColor":"#222","padding":"10px"})
+    ], style={"display":"flex","gap":"20px"}),
+
+    # Gráfico IPTU+ITBI (também em card escuro)
+    html.Div([
+        dcc.Graph(figure=fig_iptu_itbi,
+                  style={"marginTop":"30px","backgroundColor":"#222"})
+    ], style={"backgroundColor":"#222","padding":"10px","marginTop":"20px"})
 ])
 
 # =========================
@@ -280,10 +292,11 @@ def atualizar_mapa(tipo, estilo):
     if len(dados) > 0:
         fig_hist = px.histogram(dados, x="Preço", nbins=30,
                                 title=f"Distribuição de Vendas - {tipo}")
-        fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
     else:
         fig_hist = px.histogram(title="Sem dados para este filtro")
-        fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
+
+    # Fundo escuro no histograma
+    fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
 
     # Cards
     card1 = html.Div([
@@ -291,19 +304,19 @@ def atualizar_mapa(tipo, estilo):
         html.P(f"Total: {len(dados)}", style={"color": "#eee"}),
         html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"}),
         html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"})
-    ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222"})
+    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
 
     card2 = html.Div([
         html.H4("Previsão IPTU", style={"color": "#eee"}),
         html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
         html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-    ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222"})
+    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
 
     card3 = html.Div([
         html.H4("Previsão ITBI", style={"color": "#eee"}),
         html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
         html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-    ], style={"border": "1px solid #444", "padding": "15px", "flex": "1", "backgroundColor": "#222"})
+    ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
 
     cards = [card1, card2, card3]
 
