@@ -284,6 +284,7 @@ app.layout = html.Div([
 # Callback
 # =========================
 @app.callback(
+    @app.callback(
     Output("mapa", "srcDoc"),
     Output("grafico-precos", "figure"),
     Output("cards", "children"),
@@ -314,27 +315,29 @@ def atualizar_mapa(tipo, estilo):
             fig_hist = px.histogram(title="Sem dados para este filtro")
         fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
 
-        # Cards horizontais
+        # Três cards horizontais
         card1 = html.Div([
             html.H4("Imóveis filtrados", style={"color": "#eee"}),
             html.P(f"Total: {len(dados)}", style={"color": "#eee"}),
             html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"}),
             html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"})
-        ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
+        ], style={"backgroundColor":"#222","padding":"20px","flex":"1","border":"1px solid #444"}),
 
         card2 = html.Div([
             html.H4("Previsão IPTU", style={"color": "#eee"}),
             html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
             html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-        ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
+        ], style={"backgroundColor":"#222","padding":"20px","flex":"1","border":"1px solid #444"}),
 
         card3 = html.Div([
             html.H4("Previsão ITBI", style={"color": "#eee"}),
             html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
             html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-        ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
+        ], style={"backgroundColor":"#222","padding":"20px","flex":"1","border":"1px solid #444"})
 
-        cards = [card1, card2, card3]
+        # Retorna os três cards lado a lado
+        cards = html.Div([card1, card2, card3],
+                         style={"display":"flex","gap":"20px","width":"100%"})
 
         return mapa_html, fig_hist, cards
 
