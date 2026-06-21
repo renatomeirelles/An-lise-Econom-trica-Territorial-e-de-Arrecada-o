@@ -85,11 +85,13 @@ forecast_itbi = model_itbi.forecast(steps=2)  # apenas 2026 e 2027
 # =========================
 # Gráfico IPTU+ITBI com previsões (sem gap, até 2027)
 # =========================
-df_plot = df_treino.reset_index()
-df_plot = df_plot.melt(id_vars="Ano", var_name="Indicador", value_name="Valor")
-df_plot["Tipo"] = "Histórico"
 
-# Previsões — apenas 2026 e 2027
+# Histórico até 2025
+df_plot_hist = df_treino.reset_index()
+df_plot_hist = df_plot_hist.melt(id_vars="Ano", var_name="Indicador", value_name="Valor")
+df_plot_hist["Tipo"] = "Histórico"
+
+# Previsões 2026–2027
 df_forecast = pd.DataFrame({
     "Ano": [2026, 2027, 2026, 2027],
     "Indicador": ["IPTU","IPTU","ITBI","ITBI"],
@@ -97,13 +99,20 @@ df_forecast = pd.DataFrame({
               forecast_itbi.iloc[0], forecast_itbi.iloc[1]],
     "Tipo": ["Previsão","Previsão","Previsão","Previsão"]
 })
-df_plot = pd.concat([df_plot, df_forecast])
 
+# Concatenar histórico + previsão em uma única série contínua
+df_plot = pd.concat([df_plot_hist, df_forecast])
+
+# Gráfico contínuo: linha sólida até 2025, pontilhada em 2026–2027
 fig_iptu_itbi = px.line(
     df_plot, x="Ano", y="Valor", color="Indicador",
     line_dash="Tipo", markers=True,
     title="Evolução Histórica e Previsões IPTU e ITBI (2026–2027)"
 )
+
+# Forçar ordem cronológica sem buraco
+fig_iptu_itbi.update_xaxes(dtick=1)
+
 
 # =========================
 # Paleta e faixas para coroplético
