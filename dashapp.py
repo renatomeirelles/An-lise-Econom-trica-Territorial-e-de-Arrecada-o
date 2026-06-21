@@ -257,14 +257,13 @@ app.layout = html.Div([
         ], style={"flex": "1"})
     ], style={"display": "flex", "gap": "20px", "marginBottom": "20px"}),
 
-    # Linha de cards resumo (callback vai preencher aqui)
-    html.Div(id="cards", style={"display":"flex","gap":"20px","margin":"20px 0"}),
-
-    # Mapa + gráfico de distribuição lado a lado
+    # Mapa + resumo dos imóveis
     html.Div([
         html.Div([
-            html.Iframe(id="mapa", width="100%", height="600",
-                        style={"border":"none","backgroundColor":"#222"})
+            html.Iframe(id="mapa", width="100%", height="500",
+                        style={"border":"none","backgroundColor":"#222"}),
+            html.Div(id="resumo-imoveis",
+                     style={"backgroundColor":"#222","padding":"15px","marginTop":"10px","border":"1px solid #444"})
         ], style={"flex":"2"}),
 
         html.Div([
@@ -273,10 +272,12 @@ app.layout = html.Div([
         ], style={"flex":"1","backgroundColor":"#222","padding":"10px","border":"1px solid #444"})
     ], style={"display":"flex","gap":"20px"}),
 
-    # Gráfico IPTU+ITBI
+    # Gráfico IPTU+ITBI + previsões
     html.Div([
         dcc.Graph(figure=fig_iptu_itbi,
-                  style={"marginTop":"30px","backgroundColor":"#222"})
+                  style={"marginTop":"30px","backgroundColor":"#222"}),
+        html.Div(id="previsoes",
+                 style={"display":"flex","gap":"20px","marginTop":"10px"})
     ], style={"backgroundColor":"#222","padding":"10px","marginTop":"20px","border":"1px solid #444"})
 ])
 
@@ -286,7 +287,8 @@ app.layout = html.Div([
 @app.callback(
     Output("mapa", "srcDoc"),
     Output("grafico-precos", "figure"),
-    Output("cards", "children"),
+    Output("resumo-imoveis", "children"),
+    Output("previsoes", "children"),
     Input("filtro-tipo", "value"),
     Input("filtro-estilo", "value")
 )
@@ -314,36 +316,35 @@ def atualizar_mapa(tipo, estilo):
             fig_hist = px.histogram(title="Sem dados para este filtro")
         fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
 
-        # Cards horizontais
-        card1 = html.Div([
-            html.H4("Imóveis filtrados", style={"color": "#eee"}),
-            html.P(f"Total: {len(dados)}", style={"color": "#eee"}),
-            html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"}),
-            html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"})
-        ], style={"backgroundColor":"#222","padding":"20px","flex":"1","border":"1px solid #444"}),
+        # Resumo dos imóveis (abaixo do mapa)
+        resumo = html.Div([
+            html.H4("Resumo dos Imóveis", style={"color":"#eee"}),
+            html.P(f"Total: {len(dados)}", style={"color":"#eee"}),
+            html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color":"#eee"}),
+            html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color":"#eee"})
+        ])
 
-        card2 = html.Div([
-            html.H4("Previsão IPTU", style={"color": "#eee"}),
-            html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
-            html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-        ], style={"backgroundColor":"#222","padding":"20px","flex":"1","border":"1px solid #444"}),
+        # Previsões (abaixo do gráfico IPTU/ITBI)
+        previsao_iptu = html.Div([
+            html.H4("Previsão IPTU", style={"color":"#eee"}),
+            html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color":"#eee"}),
+            html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color":"#eee"})
+        ], style={"backgroundColor":"#222","padding":"15px","flex":"1","border":"1px solid #444"}),
 
-        card3 = html.Div([
-            html.H4("Previsão ITBI", style={"color": "#eee"}),
-            html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
-            html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-        ], style={"backgroundColor":"#222","padding":"20px","flex":"1","border":"1px solid #444"})
+        previsao_itbi = html.Div([
+            html.H4("Previsão ITBI", style={"color":"#eee"}),
+            html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", "."), style={"color":"#eee"}),
+            html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color":"#eee"})
+        ], style={"backgroundColor":"#222","padding":"15px","flex":"1","border":"1px solid #444"})
 
-        cards = [card1, card2, card3]
-
-        return mapa_html, fig_hist, cards
+        return mapa_html, fig_hist, resumo, [previsao_iptu, previsao_itbi]
 
     except Exception as e:
-        fallback_card = html.Div([
+        fallback = html.Div([
             html.H4("Erro ao gerar resumo", style={"color":"#fff"}),
             html.P(str(e), style={"color":"#fff"})
         ], style={"backgroundColor":"#900","padding":"20px"})
-        return "", px.histogram(title="Erro"), [fallback_card]
+        return "", px.histogram(title="Erro"), fallback, [fallback]
 
 if __name__ == "__main__":
     app.run_server(debug=True)
