@@ -257,15 +257,7 @@ app.layout = html.Div([
         ], style={"flex": "1"})
     ], style={"display": "flex", "gap": "20px", "marginBottom": "20px"}),
 
-    # Card fixo gigante para teste
-    html.Div([
-        html.Div([
-            html.H2("CARD FIXO DE TESTE", style={"color":"#fff"}),
-            html.P("Se você está vendo este card, o layout funciona!", style={"color":"#fff"})
-        ], style={"backgroundColor":"#222","padding":"50px","flex":"1","border":"2px solid red"})
-    ], style={"display":"flex","gap":"20px","margin":"20px 0"}),
-
-    # Linha de cards resumo (callback)
+    # Linha de cards resumo (callback vai preencher aqui)
     html.Div(id="cards", style={"display":"flex","gap":"20px","margin":"20px 0"}),
 
     # Mapa + gráfico de distribuição lado a lado
@@ -300,9 +292,6 @@ app.layout = html.Div([
 )
 def atualizar_mapa(tipo, estilo):
     try:
-        print("Callback rodou com tipo:", tipo, "estilo:", estilo)
-
-        # Filtrar dados
         dados = df_imoveis if tipo == "Todos" else df_imoveis[df_imoveis["Tipo"] == tipo]
 
         # Escolher mapa
@@ -350,7 +339,6 @@ def atualizar_mapa(tipo, estilo):
         return mapa_html, fig_hist, cards
 
     except Exception as e:
-        print("Erro no callback:", e)
         # Card de fallback para debug
         fallback_card = html.Div([
             html.H4("Erro ao gerar cards", style={"color":"#fff"}),
@@ -360,3 +348,4 @@ def atualizar_mapa(tipo, estilo):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
