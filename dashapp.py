@@ -61,10 +61,16 @@ fig_iptu_itbi = px.line(
 )
 
 # =========================
-# Função para gerar mapa Folium
+# Função para gerar mapa Folium com Jawg
 # =========================
 def gerar_mapa(tipo="Todos", estilo="coropletico"):
-    mapa = folium.Map(location=[-23.42, -51.93], zoom_start=12)
+    # Fundo escuro da Jawg
+    mapa = folium.Map(
+        location=[-23.42, -51.93],
+        zoom_start=12,
+        tiles="https://tile.jawg.io/jawg-dark/{z}/{x}/{y}{r}.png?access-token=SEU_ACCESS_TOKEN_AQUI",
+        attr="Jawg Maps"
+    )
 
     # Filtrar imóveis
     if tipo != "Todos":
@@ -91,22 +97,23 @@ def gerar_mapa(tipo="Todos", estilo="coropletico"):
 
         # Tooltips
         for _, row in gdf_stats.iterrows():
-            tooltip = folium.Tooltip(
-                f"<b>{row['Bairro']}</b><br>"
-                f"Médio: R$ {row['preco_medio']:.0f}<br>"
-                f"Máx: R$ {row['preco_max']:.0f}<br>"
-                f"Mín: R$ {row['preco_min']:.0f}<br>"
-                f"Var vs município: {row['variacao_vs_municipio']:.1f}%<br>"
-                f"M² médio: R$ {row['preco_m2_medio']:.0f}"
-            )
-            folium.GeoJson(row["geometry"], tooltip=tooltip).add_to(mapa)
+            if pd.notnull(row["preco_medio"]):
+                tooltip = folium.Tooltip(
+                    f"<b>{row['Bairro']}</b><br>"
+                    f"Médio: R$ {row['preco_medio']:.0f}<br>"
+                    f"Máx: R$ {row['preco_max']:.0f}<br>"
+                    f"Mín: R$ {row['preco_min']:.0f}<br>"
+                    f"Var vs município: {row['variacao_vs_municipio']:.1f}%<br>"
+                    f"M² médio: R$ {row['preco_m2_medio']:.0f}"
+                )
+                folium.GeoJson(row["geometry"], tooltip=tooltip).add_to(mapa)
 
     # Pontos
     elif estilo == "pontos":
         for _, row in dados.iterrows():
             folium.CircleMarker(
                 location=[row["latitude"], row["longitude"]],
-                radius=4,
+                radius=3,
                 popup=f"{row['Tipo']} - R$ {row['Preço']:,.0f}",
                 color="blue",
                 fill=True
@@ -125,10 +132,11 @@ def gerar_mapa(tipo="Todos", estilo="coropletico"):
     elif estilo == "calor":
         HeatMap(
             data=dados[["latitude", "longitude"]].values.tolist(),
-            radius=10, blur=15, max_zoom=12
+            radius=6, blur=8, max_zoom=12
         ).add_to(mapa)
 
     return mapa._repr_html_()
+
 # =========================
 # Layout
 # =========================
