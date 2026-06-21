@@ -34,6 +34,7 @@ gdf_bairros = gpd.read_file("data/municipio_completo.shp")
 df_imoveis["Preço"] = pd.to_numeric(df_imoveis["Preço"], errors="coerce")
 df_imoveis["Preço por m²"] = pd.to_numeric(df_imoveis["Preço por m²"], errors="coerce")
 df_imoveis = df_imoveis.dropna(subset=["Preço", "latitude", "longitude"])
+df_imoveis = df_imoveis[(df_imoveis["latitude"].between(-90,90)) & (df_imoveis["longitude"].between(-180,180))]
 
 def calcular_stats(dados):
     stats = dados.groupby("Bairro").agg(
@@ -57,7 +58,6 @@ df_series = df_series.rename(columns={"index": "Ano"})
 df_series["Ano"] = pd.to_numeric(df_series["Ano"], errors="coerce")
 df_series["Valor"] = pd.to_numeric(df_series["Valor"].astype(str).str.replace(",", "."), errors="coerce")
 df_series = df_series[df_series["Indicador"].isin(["IPTU", "ITBI"])]
-
 # =========================
 # ARIMA previsões IPTU e ITBI
 # =========================
@@ -75,12 +75,12 @@ model_itbi = ARIMA(itbi_series, order=(1,1,1)).fit()
 forecast_itbi = model_itbi.forecast(steps=2)
 
 # =========================
-# Gráfico IPTU+ITBI com previsões
+# Gráfico IPTU+ITBI com previsões (sem gap)
 # =========================
 df_plot = df_final.reset_index()
 df_plot = df_plot.melt(id_vars="Ano", var_name="Indicador", value_name="Valor")
+df_plot["Tipo"] = "Histórico"
 
-# adicionar previsões
 df_forecast = pd.DataFrame({
     "Ano": [2026, 2027, 2026, 2027],
     "Indicador": ["IPTU","IPTU","ITBI","ITBI"],
@@ -88,11 +88,11 @@ df_forecast = pd.DataFrame({
               forecast_itbi.iloc[0], forecast_itbi.iloc[1]],
     "Tipo": "Previsão"
 })
-df_plot["Tipo"] = "Histórico"
 df_plot = pd.concat([df_plot, df_forecast])
 
 fig_iptu_itbi = px.line(
-    df_plot, x="Ano", y="Valor", color="Indicador", line_dash="Tipo",
+    df_plot, x="Ano", y="Valor", color="Indicador",
+    line_dash="Tipo", markers=True,
     title="Evolução Histórica e Previsões IPTU e ITBI"
 )
 
@@ -120,11 +120,11 @@ def gerar_mapa_coropletico(estilo_jawg="jawg-dark"):
                     break
         tooltip = folium.Tooltip(
             f"<b>{row['NOME']}</b><br>"
-            f"Médio: R$ {row['preco_medio']:.0f}<br>"
-            f"Máx: R$ {row['preco_max']:.0f}<br>"
-            f"Mín: R$ {row['preco_min']:.0f}<br>"
+            f"Médio: R$ {row['preco_medio']:,.0f}".replace(",",".") + "<br>"
+            f"Máx: R$ {row['preco_max']:,.0f}".replace(",",".") + "<br>"
+            f"Mín: R$ {row['preco_min']:,.0f}".replace(",",".") + "<br>"
             f"Var vs município: {row['variacao_vs_municipio']:.1f}%<br>"
-            f"M² médio: R$ {row['preco_m2_medio']:.0f}"
+            f"M² médio: R$ {row['preco_m2_medio']:,.0f}".replace(",",".")
         )
         folium.GeoJson(row["geometry"],
             style_function=lambda feature, color=cor: {
@@ -135,8 +135,10 @@ def gerar_mapa_coropletico(estilo_jawg="jawg-dark"):
     return mapa._repr_html_()
 
 def gerar_mapa_pontos(estilo_jawg="jawg-dark"):
+    dados = df_imoveis.dropna(subset=["latitude","longitude"])
+    dados = dados[(dados["latitude"].between(-90,90)) & (dados["longitude"].between(-180,180))]
     mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13, tiles=_tiles_url(estilo_jawg), attr="Jawg Maps")
-    for _, row in df_imoveis.iterrows():
+    for _, row in dados.iterrows():
         folium.CircleMarker(
             location=[row["latitude"], row["longitude"]],
             radius=2,
@@ -149,9 +151,11 @@ def gerar_mapa_pontos(estilo_jawg="jawg-dark"):
     return mapa._repr_html_()
 
 def gerar_mapa_cluster(estilo_jawg="jawg-dark"):
+    dados = df_imoveis.dropna(subset=["latitude","longitude"])
+    dados = dados[(dados["latitude"].between(-90,90)) & (dados["longitude"].between(-180,180))]
     mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13, tiles=_tiles_url(estilo_jawg), attr="Jawg Maps")
     cluster = MarkerCluster(disableClusteringAtZoom=17).add_to(mapa)
-    for _, row in df_imoveis.iterrows():
+    for _, row in dados.iterrows():
         folium.Marker(
             location=[row["latitude"], row["longitude"]],
             popup=f"{row['Tipo']} — R$ {row['Preço']:,.0f}"
@@ -159,8 +163,9 @@ def gerar_mapa_cluster(estilo_jawg="jawg-dark"):
     return mapa._repr_html_()
 
 def gerar_mapa_calor(estilo_jawg="jawg-dark"):
+    dados = df_imoveis.dropna(subset=["latitude","longitude"])
+    heat_data = dados[['latitude', 'longitude']].values.tolist()
     mapa = folium.Map(location=CENTRO_MARINGA, zoom_start=13, tiles=_tiles_url(estilo_jawg), attr="Jawg Maps")
-    heat_data = df_imoveis[['latitude', 'longitude']].dropna().values.tolist()
     HeatMap(heat_data, radius=10, blur=12, max_zoom=18).add_to(mapa)
     return mapa._repr_html_()
 # =========================
@@ -238,19 +243,19 @@ def atualizar_mapa(tipo, estilo):
     card1 = html.Div([
         html.H4("Imóveis filtrados"),
         html.P(f"Total: {len(dados)}"),
-        html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}" if len(dados) > 0 else "Sem dados")
+        html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",",".") if len(dados) > 0 else "Sem dados")
     ], style={"border": "1px solid #ccc", "padding": "10px", "flex": "1"})
 
     card2 = html.Div([
         html.H4("Previsão IPTU"),
-        html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}"),
-        html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}")
+        html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",",".") ),
+        html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",",".") )
     ], style={"border": "1px solid #ccc", "padding": "10px", "flex": "1"})
 
     card3 = html.Div([
         html.H4("Previsão ITBI"),
-        html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}"),
-        html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}")
+        html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",",".") ),
+        html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",",".") )
     ], style={"border": "1px solid #ccc", "padding": "10px", "flex": "1"})
 
     cards = [card1, card2, card3]
