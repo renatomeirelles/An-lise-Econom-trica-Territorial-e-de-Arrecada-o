@@ -128,17 +128,21 @@ fig_iptu_itbi = px.line(
 )
 
 # Estilo das linhas: sólido até 2025, pontilhado a partir de 2026
-for indicador in ["IPTU", "ITBI"]:
+for indicador, forecast_df in [("IPTU", iptu_forecast), ("ITBI", itbi_forecast)]:
+    val_2026 = forecast_df.loc[forecast_df["Ano"]==2026,"Valor"].values[0]
+    val_2027 = forecast_df.loc[forecast_df["Ano"]==2027,"Valor"].values[0]
     fig_iptu_itbi.add_scatter(
         x=df_full[df_full["Ano"] >= 2026]["Ano"],
         y=df_full[(df_full["Ano"] >= 2026) & (df_full["Indicador"] == indicador)]["Valor"],
         mode="lines+markers",
-        name=f"{indicador} Previsão",
+        # legenda já mostra os valores previstos
+        name=f"{indicador} Previsão (2026: R$ {val_2026:,.0f} | 2027: R$ {val_2027:,.0f})",
         line=dict(dash="dash")
     )
 
 fig_iptu_itbi.update_xaxes(dtick=1)
 fig_iptu_itbi.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
+
 
 # =========================
 # Paleta e faixas para coroplético
