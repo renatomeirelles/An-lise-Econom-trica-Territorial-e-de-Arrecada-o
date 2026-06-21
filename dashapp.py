@@ -128,21 +128,44 @@ fig_iptu_itbi = px.line(
 )
 
 # Estilo das linhas: sólido até 2025, pontilhado a partir de 2026
-for indicador, forecast_df in [("IPTU", iptu_forecast), ("ITBI", itbi_forecast)]:
-    val_2026 = forecast_df.loc[forecast_df["Ano"]==2026,"Valor"].values[0]
-    val_2027 = forecast_df.loc[forecast_df["Ano"]==2027,"Valor"].values[0]
+for indicador in ["IPTU", "ITBI"]:
     fig_iptu_itbi.add_scatter(
         x=df_full[df_full["Ano"] >= 2026]["Ano"],
         y=df_full[(df_full["Ano"] >= 2026) & (df_full["Indicador"] == indicador)]["Valor"],
         mode="lines+markers",
-        # legenda já mostra os valores previstos
-        name=f"{indicador} Previsão (2026: R$ {val_2026:,.0f} | 2027: R$ {val_2027:,.0f})",
+        name=f"{indicador} Previsão",
         line=dict(dash="dash")
     )
 
+# Adicionar duas linhas extras na legenda com os valores previstos
+iptu_2026 = iptu_forecast.loc[iptu_forecast["Ano"]==2026,"Valor"].values[0]
+iptu_2027 = iptu_forecast.loc[iptu_forecast["Ano"]==2027,"Valor"].values[0]
+itbi_2026 = itbi_forecast.loc[itbi_forecast["Ano"]==2026,"Valor"].values[0]
+itbi_2027 = itbi_forecast.loc[itbi_forecast["Ano"]==2027,"Valor"].values[0]
+
+fig_iptu_itbi.add_scatter(
+    x=[None], y=[None], mode="markers",
+    marker=dict(color="green"),
+    name=f"IPTU Previsto 2026: R$ {iptu_2026:,.0f}".replace(",", ".")
+)
+fig_iptu_itbi.add_scatter(
+    x=[None], y=[None], mode="markers",
+    marker=dict(color="green"),
+    name=f"IPTU Previsto 2027: R$ {iptu_2027:,.0f}".replace(",", ".")
+)
+fig_iptu_itbi.add_scatter(
+    x=[None], y=[None], mode="markers",
+    marker=dict(color="purple"),
+    name=f"ITBI Previsto 2026: R$ {itbi_2026:,.0f}".replace(",", ".")
+)
+fig_iptu_itbi.add_scatter(
+    x=[None], y=[None], mode="markers",
+    marker=dict(color="purple"),
+    name=f"ITBI Previsto 2027: R$ {itbi_2027:,.0f}".replace(",", ".")
+)
+
 fig_iptu_itbi.update_xaxes(dtick=1)
 fig_iptu_itbi.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
-
 
 # =========================
 # Paleta e faixas para coroplético
