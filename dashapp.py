@@ -314,34 +314,28 @@ def atualizar_mapa(tipo, estilo):
             fig_hist = px.histogram(title="Sem dados para este filtro")
         fig_hist.update_layout(plot_bgcolor="#222", paper_bgcolor="#222", font_color="#eee")
 
-        # Cards
-        card1 = html.Div([
-            html.H4("Imóveis filtrados", style={"color": "#eee"}),
-            html.P(f"Total: {len(dados)}", style={"color": "#eee"}),
-            html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"}),
-            html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color": "#eee"})
-        ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
+        # Card único vermelho com todas as informações
+        card_resumo = html.Div([
+            html.H2("RESUMO COMPLETO", style={"color":"#fff"}),
+            html.H4("Imóveis filtrados", style={"color":"#fff"}),
+            html.P(f"Total: {len(dados)}", style={"color":"#fff"}),
+            html.P(f"Média preço: R$ {dados['Preço'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color":"#fff"}),
+            html.P(f"Média preço/m²: R$ {dados['Preço por m²'].mean():,.0f}".replace(",", ".") if len(dados) > 0 else "Sem dados", style={"color":"#fff"}),
 
-        card2 = html.Div([
-            html.H4("Previsão IPTU", style={"color": "#eee"}),
-            html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
-            html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-        ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"}),
+            html.H4("Previsão IPTU", style={"color":"#fff","marginTop":"20px"}),
+            html.P(f"2026: R$ {forecast_iptu.iloc[0]:,.0f}".replace(",", "."), style={"color":"#fff"}),
+            html.P(f"2027: R$ {forecast_iptu.iloc[1]:,.0f}".replace(",", "."), style={"color":"#fff"}),
 
-        card3 = html.Div([
-            html.H4("Previsão ITBI", style={"color": "#eee"}),
-            html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", "."), style={"color": "#eee"}),
-            html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color": "#eee"})
-        ], style={"border":"1px solid #444","padding":"15px","flex":"1","backgroundColor":"#222"})
+            html.H4("Previsão ITBI", style={"color":"#fff","marginTop":"20px"}),
+            html.P(f"2026: R$ {forecast_itbi.iloc[0]:,.0f}".replace(",", "."), style={"color":"#fff"}),
+            html.P(f"2027: R$ {forecast_itbi.iloc[1]:,.0f}".replace(",", "."), style={"color":"#fff"})
+        ], style={"backgroundColor":"#900","padding":"30px","flex":"1","border":"2px solid red"})
 
-        cards = [card1, card2, card3]
-
-        return mapa_html, fig_hist, cards
+        return mapa_html, fig_hist, [card_resumo]
 
     except Exception as e:
-        # Card de fallback para debug
         fallback_card = html.Div([
-            html.H4("Erro ao gerar cards", style={"color":"#fff"}),
+            html.H4("Erro ao gerar resumo", style={"color":"#fff"}),
             html.P(str(e), style={"color":"#fff"})
         ], style={"backgroundColor":"#900","padding":"20px"})
         return "", px.histogram(title="Erro"), [fallback_card]
